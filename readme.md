@@ -102,7 +102,7 @@ Running the lexer for ./out/01.test.in
 Running the lexer for ./out/02.test.in
 
 shell_prompt> source diff.sh
-Diff for ./out/02.tests.out failed
+Diff for ./out/02.test.out failed
 1/2 tests succeeded
 
 shell_prompt> source clean.sh
