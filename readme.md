@@ -71,13 +71,13 @@ Assuming the following root project directory layout (or similar):
 ├── debug
 ├── diff.sh
 ├── dist-newstyle
-├── expected    --->   (this will be out expected output directory)
+├── expected    --->   (this will be our expected output directory)
 ├── lib
 ├── out         --->   (this will be our output directory)
 ├── readme.md
 ├── run.sh
 ├── src
-└── todo.txt    --->   (this will be our target/input directory)
+└── tests       --->   (this will be our target/input directory)
 ```
 
 Then each one of the scripts will contain the following variable definitions:
