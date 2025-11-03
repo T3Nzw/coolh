@@ -24,4 +24,5 @@ cabal.project.local~
 notes/
 tests/
 out/
+debug/
 resources.txt
