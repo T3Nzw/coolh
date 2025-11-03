@@ -71,3 +71,5 @@ TODO:
 [] a few tests break bc of String contains unescaped newline error.
    the line number should be n-1, dunno why. can fix easily using
    some dirty hacks, but will look at it more carefully
+
+[] fix escape sequences and string too long errors

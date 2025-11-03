@@ -6,10 +6,10 @@ cabal build coolh.cabal
 
 # Modify both input (test_dir) and output (out_dir)
 # directories as needed
-test_dir="./tests"
+target_dir="./tests"
 out_dir="./out"
 
-for f in ${test_dir}/*; do
+for f in ${target_dir}/*; do
   echo "Running lexer for $f"
   filename="$(basename $f .in)"
   # Run the project for each file in the test_dir directory.
