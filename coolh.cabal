@@ -1,0 +1,59 @@
+cabal-version:      3.0
+name:               coolh
+version:            0.1.0.0
+license:            MIT
+license-file:       LICENSE
+author:             T3Nzw
+maintainer:         t3nszw@gmail.com
+category:           Language
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall
+
+executable coolh
+    import:             warnings
+
+    main-is:            Main.hs
+
+    other-modules:      Data.Stream,
+                        Data.Sizeable,
+                        Data.BSUtil,
+                        Lexer.Lexer,
+                        Lexer.Error,
+                        Lexer.Util,
+                        Lexer.Parser.Parser,
+                        Lexer.Parser.Combinators,
+                        Parser.Core,
+                        Parser.Position,
+                        Parser.Result,
+                        File.LexerFmt,
+                        Debug.Flags
+
+    default-extensions: KindSignatures,
+                        TypeFamilies,
+                        FlexibleContexts,
+                        OverloadedStrings,
+                        TemplateHaskell,
+                        FlexibleInstances,
+                        LambdaCase,
+                        LinearTypes
+
+    build-depends:      base ^>=4.18.3.0,
+                        bytestring,
+                        text,
+                        lens,
+                        mtl
+
+    hs-source-dirs:     app,
+                        lib,
+                        lib/Data,
+                        lib/Parser,
+                        lib/Debug,
+                        src,
+                        src/Lexer,
+                        src/Lexer/Parser,
+                        src/File
+
+    default-language:   Haskell2010

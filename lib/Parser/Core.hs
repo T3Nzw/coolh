@@ -1,0 +1,189 @@
+module Parser.Core
+  ( Parser,
+    runParser,
+    item,
+    sat,
+    but,
+    many,
+    many1,
+    oneOf,
+    notOneOf,
+    zeroOrOne,
+    char,
+    string,
+    label,
+    peek,
+    Parser.Core.until,
+    untilPlus,
+    Parser.Core.traverse,
+    tryCatch,
+    eof,
+    (<+>),
+  )
+where
+
+import qualified Control.Applicative as App
+import Control.Lens ((&), (.~), (^.))
+import Control.Monad (MonadPlus)
+import Data.Sizeable (Sizeable (..))
+import Data.Stream (Stream (..))
+import qualified Parser.Position as Pos
+
+newtype Parser e s a
+  = MkParser {runParser :: Pos.State s -> Either e (a, Pos.State s)}
+
+instance Functor (Parser e s) where
+  fmap f (MkParser p) = MkParser $ \inp ->
+    case p inp of
+      Left err -> Left err
+      Right (value, st) -> Right (f value, st)
+
+instance Applicative (Parser e s) where
+  pure value = MkParser $ \inp -> Right (value, inp)
+  MkParser pf <*> MkParser p = MkParser $ \inp -> do
+    (f, st1) <- pf inp
+    (x, st2) <- p st1
+    Right (f x, st2)
+
+instance Monad (Parser e s) where
+  return = pure
+  MkParser p >>= f = MkParser $ \inp -> do
+    (x, st1) <- p inp
+    let (MkParser p') = f x
+    p' st1
+
+-- The error type has to be a Monoid instance
+-- because empty needs a "default value" for
+-- the parser, and it's impossible to create
+-- a default value for just any type.
+-- There are probably other, much more elegant
+-- ways to do this, but oh well
+instance (Monoid e) => App.Alternative (Parser e s) where
+  empty = MkParser . const $ Left mempty
+
+  -- FCFS
+  MkParser lp <|> MkParser rp =
+    MkParser $ \inp ->
+      case (lp inp, rp inp) of
+        (Right val, _) -> Right val
+        (_, rhs) -> rhs
+
+instance (Monoid e) => MonadPlus (Parser e s)
+
+-- NOTE: it's likely i won't be needing this at all
+instance (Monoid e, Read e) => MonadFail (Parser e s) where
+  fail msg = MkParser . const $ Left $ read msg
+
+-- | Run both parsers and apply maximal munch + FCFS strategies
+(<+>) :: (Stream s, Monoid e, Sizeable a) => Parser e s a -> Parser e s a -> Parser e s a
+MkParser lp <+> MkParser rp = MkParser $ \inp ->
+  case (lp inp, rp inp) of
+    (Right lhs@(val1, _), Right rhs@(val2, _)) ->
+      Right $ if size val1 >= size val2 then lhs else rhs
+    (Right lhs, _) -> Right lhs
+    (_, rhs) -> rhs
+
+infixl 3 <+>
+
+-- | Consume the head of a non-empty stream unconditionally
+item :: (Stream s, Monoid e) => (Element s -> a) -> Parser e s a
+item f = MkParser $ \inp ->
+  case uncons (inp ^. Pos.input) of
+    Nothing -> Left mempty
+    Just (h, t) -> Right (f h, computeOffset (inp & Pos.input .~ t) h)
+
+-- | Consume if the head of a non-empty stream satisfies the predicate
+sat :: (Stream s, Monoid e) => (Element s -> Bool) -> Parser e s (Element s)
+sat p = MkParser $ \inp ->
+  case uncons (inp ^. Pos.input) of
+    Just (h, t) | p h -> Right (h, computeOffset (inp & Pos.input .~ t) h)
+    _ -> Left mempty
+
+-- | Consume if the head of a non-empty stream does not satisfy the predicate
+but :: (Stream s, Monoid e) => (Element s -> Bool) -> Parser e s (Element s)
+but p = sat (not . p)
+
+-- | Kleene star
+many :: (Stream s, Monoid e) => Parser e s a -> Parser e s [a]
+many p = many1 p App.<|> pure []
+
+-- | Kleene plus
+many1 :: (Stream s, Monoid e) => Parser e s a -> Parser e s [a]
+many1 p = do
+  x <- p
+  xs <- many p
+  pure $ x : xs
+
+-- | Consume if the head of a non-empty stream is an element of the range
+oneOf :: (Stream s, Monoid e, Eq (Element s)) => [Element s] -> Parser e s (Element s)
+oneOf = foldr (\x -> (App.<|>) $ sat (== x)) App.empty
+
+notOneOf :: (Stream s, Monoid e, Eq (Element s)) => [Element s] -> Parser e s (Element s)
+-- TODO: implement
+notOneOf = undefined
+
+-- | Apply the parser zero or one times
+zeroOrOne :: (Stream s, Monoid e) => Parser e s a -> Parser e s (Maybe a)
+zeroOrOne p = pure <$> p App.<|> pure Nothing
+
+-- | Consume the head of a non-empty stream if it matches the given element
+char :: (Stream s, Monoid e, Eq (Element s)) => Element s -> Parser e s (Element s)
+char x = sat (== x)
+
+traverse :: (Stream s, Monoid e) => (Element s -> Parser e s (Element s)) -> s -> Parser e s s
+traverse p s = case uncons s of
+  Nothing -> pure empty
+  Just (h, t) -> liftA2 cons (p h) (Parser.Core.traverse p t)
+
+-- | Consume a sequence of stream elements if they match
+string :: (Stream s, Monoid e, Eq (Element s)) => s -> Parser e s s
+string = Parser.Core.traverse char
+
+-- | Inject an error label into the parser
+label :: (Stream s, Monoid e) => e -> Parser e s a -> Parser e s a
+label err (MkParser p) = MkParser $ \inp ->
+  case p inp of
+    Left _ -> Left err
+    Right val -> Right val
+
+-- | Inspect the first element of a non-empty stream
+-- without consuming any input
+peek :: (Stream s, Monoid e) => Parser e s (Element s)
+peek = MkParser $ \inp ->
+  case uncons (inp ^. Pos.input) of
+    Nothing -> Left mempty
+    Just (h, _) -> Right (h, inp)
+
+-- | Consume all characters uing the first parser until the second
+-- parser succeeds
+until :: (Stream s, Monoid e) => Parser e s a -> Parser e s end -> Parser e s [a]
+until p end = MkParser $ \inp ->
+  case runParser end inp of
+    Right (_, t) -> Right ([], t)
+    Left _ -> do
+      (x, t1) <- runParser p inp
+      (xs, t2) <- runParser (Parser.Core.until p end) t1
+      pure (x : xs, t2)
+
+untilPlus :: (Stream s, Monoid e) => Parser e s a -> Parser e s a -> Parser e s [a]
+untilPlus p end = MkParser $ \inp ->
+  case runParser end inp of
+    Right (val, t) -> Right ([val], t)
+    Left _ -> do
+      (x, t1) <- runParser p inp
+      (xs, t2) <- runParser (untilPlus p end) t1
+      pure (x : xs, t2)
+
+tryCatch :: (Stream s, Monoid e) => Parser e s a -> Parser e s (Either e a)
+tryCatch p = MkParser $ \inp ->
+  case runParser p inp of
+    Left err -> Right (Left err, inp)
+    Right (val, st) -> Right (Right val, st)
+
+-- | Succeed if there is no more input to be consumed,
+-- otherwise fail with a custom error
+eof :: (Stream s, Monoid e) => e -> Parser e s ()
+eof eofErr = MkParser $ \inp ->
+  case uncons (inp ^. Pos.input) of
+    Nothing -> Right ((), inp)
+    Just _ -> Left eofErr

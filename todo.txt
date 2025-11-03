@@ -1,0 +1,73 @@
+TODO:
+
+[x] finish applicative and monad instances for parser
+
+[x] add comment parser
+
+[x] add string parser
+
+[x] add eof parser combinator + add eof token type
+
+[x] read from file (in main) and run parser ~> need to abstract over that with CLI flags
+
+[x] somehow store the line number ~> State
+
+[x] unify the way of printing lexemes and errors
+
+[x] apply maximal munch and FCFS somewhere ~> (<+>)
+
+[] fix notOneOf parser combinator
+
+[x] fix Show for LexemeTag
+
+[x] handle tab width for changes in position offset
+
+[x] initial values for PosState
+
+[?] escape sequences
+
+[x] eq: = or ==?
+
+[] don't combine errors using <>
+
+[x] run parser for each lexeme individually and store in a stream
+
+[] add flags for outputting lexer info and potentially setting the tab width
+
+[] inject errors properly
+
+[x] fix invalid symbol error injection (could probably peek into the stream)
+
+[x] fix pre-incrementation of newlines
+
+[x] store errors in lexemes directly
+
+[x] ditch the Result ADT
+
+[x] "\" ~> "\\" ; gets escaped
+
+[x] control sequences get converted to hex
+
+[x] nested comments
+
+[x] one-line comments using --
+
+[?] strings! :(
+
+[] potentially fix things like offsets, etc. newlines seem
+   to work properly, but im not sure that the absolute offset/column number
+   should be the ones where the lexeme ends?
+
+[x] will there always be exactly one eof token at the end of the token stream?
+   or have i messed something up? use filter when outputting :D
+
+[] remove all the completed/useless things in the above list.
+   i swear i will eventually, i have attachment issues
+
+[] some files have a newline at the end (dunno if my editor added them or what)
+   which is not in the output files that contain the expected output :D:D:D
+   which is weird, bc hexdump -c <filename> also shows a newline at the end, so idk
+
+[] a few tests break bc of String contains unescaped newline error.
+   the line number should be n-1, dunno why. can fix easily using
+   some dirty hacks, but will look at it more carefully
