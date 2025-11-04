@@ -38,11 +38,16 @@ strc = do
         Nothing -> pure $ mkLexError LE.UnknownError
         Just t' -> case word8 t' of
           '\NUL' -> pure $ mkLexError LE.StringContainsEscapedNullCharacter
+          'n' -> pure $ mkLexStr "\n"
+          't' -> pure $ mkLexStr "\t"
+          'b' -> pure $ mkLexStr "\b"
+          'f' -> pure $ mkLexStr "\f"
           '\n' -> pure $ mkLexStr "\n"
           '\t' -> pure $ mkLexStr "\t"
           '\b' -> pure $ mkLexStr "\b"
           '\f' -> pure $ mkLexStr "\f"
           '"' -> pure $ mkLexStr "\""
+          '\\' -> pure $ mkLexStr "\\"
           _ -> pure . mkLexStr . pack . map char8 $ controlToHex t'
     _ -> pure . mkLexStr . pack . map char8 $ controlToHex h
 
