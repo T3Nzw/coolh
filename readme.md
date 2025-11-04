@@ -98,8 +98,8 @@ Then you can use the above shell scripts as follows:
 ```
 shell_prompt> source run.sh
 ...<some_cabal_build_stuff_here>
-Running the lexer for ./out/01.test.in
-Running the lexer for ./out/02.test.in
+Running lexer for ./out/01.test.in
+Running lexer for ./out/02.test.in
 
 shell_prompt> source diff.sh
 Diff for ./out/02.test.out failed
