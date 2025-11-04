@@ -1,7 +1,5 @@
 #!/bin/bash
 
-count=$(find ./out -maxdepth 1 -type f | wc -l)
-i=0
 
 # Modify these two depending the absolute/relative paths
 # to out_dir (or wherever the project should write output files)
@@ -9,6 +7,9 @@ i=0
 # of all tests should be)
 out_dir="./out"
 expected_out_dir="../coursework1/cw1-update3/tests/lexer"
+
+count=$(find $out_dir -maxdepth 1 -type f | wc -l)
+i=0
 
 for f in ${out_dir}/*; do
   filename="$(basename $f)"
