@@ -22,7 +22,6 @@ catlex lhs@(Lexeme (ERR _) _) _ = lhs
 catlex _ rhs@(Lexeme (ERR _) _) = rhs
 catlex lhs _ = lhs
 
--- parse directly as lexemes due to errors
 strc :: P.Parser LE.Error ByteString Lexeme
 strc = do
   h <- P.item id
@@ -34,21 +33,21 @@ strc = do
     '\f' -> pure $ mkLexStr "\f"
     '\\' -> do
       t <- P.zeroOrOne (P.item id)
-      case t of
-        Nothing -> pure $ mkLexError LE.UnknownError
+      pure $ case t of
+        Nothing -> mkLexError LE.UnknownError
         Just t' -> case word8 t' of
-          '\NUL' -> pure $ mkLexError LE.StringContainsEscapedNullCharacter
-          'n' -> pure $ mkLexStr "\n"
-          't' -> pure $ mkLexStr "\t"
-          'b' -> pure $ mkLexStr "\b"
-          'f' -> pure $ mkLexStr "\f"
-          '\n' -> pure $ mkLexStr "\n"
-          '\t' -> pure $ mkLexStr "\t"
-          '\b' -> pure $ mkLexStr "\b"
-          '\f' -> pure $ mkLexStr "\f"
-          '"' -> pure $ mkLexStr "\""
-          '\\' -> pure $ mkLexStr "\\"
-          _ -> pure . mkLexStr . pack . map char8 $ controlToHex t'
+          '\NUL' -> mkLexError LE.StringContainsEscapedNullCharacter
+          'n' -> mkLexStr "\n"
+          't' -> mkLexStr "\t"
+          'b' -> mkLexStr "\b"
+          'f' -> mkLexStr "\f"
+          '\n' -> mkLexStr "\n"
+          '\t' -> mkLexStr "\t"
+          '\b' -> mkLexStr "\b"
+          '\f' -> mkLexStr "\f"
+          '"' -> mkLexStr "\""
+          '\\' -> mkLexStr "\\"
+          _ -> mkLexStr . pack . map char8 $ controlToHex t'
     _ -> pure . mkLexStr . pack . map char8 $ controlToHex h
 
 str :: P.Parser LE.Error ByteString Lexeme
@@ -58,9 +57,6 @@ str = do
   pure $ case s of
     Left _ -> mkLexError LE.UnterminatedStringAtEOF
     Right s' -> case s' of
-      -- this is probably the only sane way to do this,
-      -- as tracking things like absolute offset, etc,
-      -- is not going to cut it due to escape sequences
       Lexeme STR_CONST (Just val) | Data.ByteString.length val > 1024 -> mkLexError (LE.StringConstantTooLong $ Data.ByteString.length val)
       _ -> s'
   where
@@ -75,7 +71,6 @@ str = do
 olcomment :: LParser
 olcomment = do
   _ <- P.string "--"
-  -- TODO: what error?
   _ <- P.until (P.item id) (newline <|> P.eof LE.UnknownError)
   pure mkLexComment
 

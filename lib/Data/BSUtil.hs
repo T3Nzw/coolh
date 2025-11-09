@@ -4,10 +4,13 @@ module Data.BSUtil
     isDigit8,
     char8,
     word8,
+    string8,
+    bytestring8,
     bytesToString,
     toLower8,
     controlToHex,
     surround8,
+    surround,
   )
 where
 
@@ -26,6 +29,12 @@ char8 = fromIntegral . fromEnum
 
 word8 :: Word8 -> Char
 word8 = chr . fromIntegral
+
+string8 :: String -> B.ByteString
+string8 = B.pack . map char8
+
+bytestring8 :: B.ByteString -> String
+bytestring8 = map word8 . B.unpack
 
 lift8 :: (Char -> r) -> (Word8 -> r)
 lift8 f = getOp $ contramap (chr . fromIntegral) (Op f)
@@ -56,6 +65,8 @@ controlToHex c
     pad [x] = ['0', x]
     pad xs = xs
 
--- beautiful (if beautiful meant unreadble)
 surround8 :: B.ByteString -> B.ByteString -> B.ByteString
 surround8 x s = B.append x . B.append s $ x
+
+surround :: String -> String -> String
+surround x s = x ++ s ++ x

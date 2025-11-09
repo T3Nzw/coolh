@@ -29,7 +29,10 @@ executable coolh
                         Parser.Position,
                         Parser.Result,
                         File.LexerFmt,
-                        Debug.Flags
+                        Debug.Flags,
+                        Parser.Parser,
+                        Parser.Error,
+                        Parser.Grammar.Grammar
 
     default-extensions: KindSignatures,
                         TypeFamilies,
@@ -54,6 +57,8 @@ executable coolh
                         src,
                         src/Lexer,
                         src/Lexer/Parser,
-                        src/File
+                        src/File,
+                        src/Parser,
+                        src/Grammar
 
     default-language:   Haskell2010
