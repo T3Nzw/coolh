@@ -6,8 +6,10 @@ cabal build coolh.cabal
 
 # Modify both input (test_dir) and output (out_dir)
 # directories as needed
-target_dir="./tests"
-out_dir="./out"
+target_dir="./tests/parser"
+out_dir="./out/parser"
+
+flag=$1
 
 for f in ${target_dir}/*; do
   echo "Running lexer for $f"
@@ -18,5 +20,5 @@ for f in ${target_dir}/*; do
   # I don't remember if you need both "-- --" when running
   # cabal with command line arguments, I think it says otherwise
   # in the documentation, but for some reason that doesn't work for me, lol
-  cabal run coolh.cabal -- -- "$f" "${out_dir}/${filename}.out"
+  cabal run coolh.cabal -- -- "$flag" "$f" "${out_dir}/${filename}.out"
 done

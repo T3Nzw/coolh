@@ -17,6 +17,14 @@ class Stream s where
   -- this completely breaks my abstraction but otherwise types are ambiguous...
   computeOffset :: State s -> Element s -> State s
 
+instance Stream [a] where
+  type Element [a] = a
+  empty = []
+  cons = (:)
+  uncons [] = Nothing
+  uncons (h : t) = Just (h, t)
+  computeOffset = const
+
 instance Stream [Char] where
   type Element [Char] = Char
   empty = []
