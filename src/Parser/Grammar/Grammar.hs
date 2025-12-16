@@ -5,18 +5,20 @@ module Parser.Grammar.Grammar where
 -- comparison operators do not associate.
 -- TODO: encode precedence of all operators
 
-import Control.Applicative ((<|>))
+import Control.Applicative (empty, (<|>))
 import qualified Data.ByteString as B
 import Data.List.NonEmpty
+import qualified Data.Map as M
 import Data.Maybe (fromJust)
 import Lexer.Lexer (LexInfo (..), Lexeme (..), LexemeTag, Lexemes)
 import qualified Lexer.Lexer as L
 import Parser.Core (Parser (runParser))
 import qualified Parser.Core as P
+import Parser.Grammar.Pratt
 import Parser.Parser
 import Parser.Position (SourcePos, initial)
 import qualified Parser.Position as Pos
-import Prelude hiding (id, not)
+import Prelude hiding (div, not)
 
 -- combinators
 
@@ -262,6 +264,7 @@ staticDispatch obj = do
   pos <- extractPos <$> lsat L.RPAREN
   pure $ StaticDispatch notype obj ty iden args pos
 
+-- this also accepts a tree lma0. TODO: FIX
 dispatch :: P.Parser String Lexemes AST
 dispatch = do
   selfPos <- extractPos <$> P.peek
@@ -270,6 +273,47 @@ dispatch = do
   args <- concatMap toList <$> P.many (commaSep ast)
   pos <- extractPos <$> lsat L.RPAREN
   pure $ Dispatch notype (selfObj selfPos) iden args pos
+
+neg :: P.Parser String Lexemes AST
+neg = do
+  _ <- lsat L.TILDA
+  pos <- extractPos <$> P.peek
+  expr <- ast
+  pure $ Tilda notype expr pos
+
+-- 3    +    4    *    12     +    5    EOF
+--    30 31     40 41       30 31
+
+operation :: P.Parser String Lexemes LexemeTag
+operation = fmap (\(LexInfo (Lexeme tag _) _) -> tag) $ foldr1 (<|>) $ Prelude.map lsat [L.ADD, L.SUB, L.MUL, L.DIV, L.LT, L.LE, L.EQ]
+
+-- i struggled to write this for about 3 hrs at uni bc i had no paper.
+-- wrote out the algorithm on paper and it finally works :)
+-- update: it doesnt
+prec' :: AST -> BindingPower -> P.Parser String Lexemes AST
+prec' lhs (_, prevRbp) = do
+  opm <- P.zeroOrOne $ P.lookahead operation
+
+  case opm of
+    Nothing -> pure lhs
+    Just op -> do
+      _ <- operation -- consume the operation
+      case M.lookup op bpInfo of
+        Nothing -> empty
+        Just (PrattPrec (lbp, rbp) ctor)
+          -- we use equal left and right binding powers to signify non-associative operators
+          | lbp == rbp -> undefined
+          | prevRbp < lbp -> do
+              rhs <- ast'
+              prec' (ctor notype lhs rhs $ astpos rhs) (lbp, rbp)
+          | otherwise -> do
+              rhs <- prec (lbp, rbp)
+              pure $ ctor notype lhs rhs $ astpos rhs
+
+prec :: BindingPower -> P.Parser String Lexemes AST
+prec bp = do
+  lhs <- ast'
+  prec' lhs bp
 
 ast' :: P.Parser String Lexemes AST
 ast' =
@@ -290,17 +334,22 @@ ast' =
       new,
       isvoid,
       caseof,
-      id
+      Parser.Grammar.Grammar.id
     ]
 
+-- TODO: make a parser for eliminating left recursion.
+-- well, instead of eliminating left recursion, it creates it :D
 lr :: AST -> P.Parser String Lexemes AST
--- dunno the precedence of monadic/alternative operators, and neither does ghc it seems
 lr obj = (staticDispatch obj >>= lr) <|> pure obj
 
+-- some sort of left factoring
 ast :: P.Parser String Lexemes AST
 ast = do
-  base <- ast'
-  lr base
+  base <- prec (0, 1) <|> ast'
+  LexInfo (Lexeme tag _) _ <- P.peek
+  case tag of
+    L.EOF -> pure base
+    _ -> lr base
 
 parse :: FilePath -> Lexemes -> Either String Program
 parse fp lexemes = fst <$> runParser (program fp) (initial lexemes)

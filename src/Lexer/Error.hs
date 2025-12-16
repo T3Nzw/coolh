@@ -14,7 +14,7 @@ data Error
   | StringContainsNullCharacter
   | StringContainsEscapedNullCharacter
   | CompoundError [Error]
-  deriving (Eq, Read) -- NOTE: this is stupid
+  deriving (Eq, Ord, Read) -- NOTE: this is stupid
 
 instance Semigroup Error where
   err1 <> err2 = CompoundError [err1, err2]

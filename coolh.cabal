@@ -33,7 +33,12 @@ executable coolh
                         Parser.Parser,
                         Parser.Error,
                         Parser.Grammar.Grammar,
+                        Parser.Grammar.Pratt,
                         File.ParserFmt,
+                        Semantic.TypedAST,
+                        Semantic.Error,
+                        Semantic.Typecheck,
+                        ReplTests
 
     default-extensions: KindSignatures,
                         TypeFamilies,
@@ -42,13 +47,18 @@ executable coolh
                         TemplateHaskell,
                         FlexibleInstances,
                         LambdaCase,
-                        LinearTypes
+                        LinearTypes,
+                        GADTs,
+                        DataKinds,
+                        TypeOperators,
+                        StandaloneDeriving
 
     build-depends:      base ^>=4.18.3.0,
                         bytestring,
                         text,
                         lens,
-                        mtl
+                        mtl,
+                        containers
 
     hs-source-dirs:     app,
                         lib,

@@ -1,5 +1,36 @@
 TODO:
 
+*****************************************************
+                        MISC
+*****************************************************
+
+[] fix flags
+
+[] better names for modules (+ better separation of code)
+
+*****************************************************
+                 SEMANTIC ANALYSER
+*****************************************************
+
+
+*****************************************************
+                      PARSER
+*****************************************************
+
+[] operator precedence
+
+[] nested lets (perhaps just in outputting? storing them as nested lets seems suboptimal)
+
+[] error handling
+
+[] static dispatch
+
+[] clean up formatting of the ast
+
+*****************************************************
+                       LEXER
+*****************************************************
+
 [x] finish applicative and monad instances for parser
 
 [x] add comment parser

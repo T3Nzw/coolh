@@ -13,6 +13,7 @@ module Parser.Core
     string,
     label,
     peek,
+    lookahead,
     Parser.Core.until,
     untilPlus,
     Parser.Core.traverse,
@@ -153,6 +154,12 @@ peek = MkParser $ \inp ->
   case uncons (inp ^. Pos.input) of
     Nothing -> Left mempty
     Just (h, _) -> Right (h, inp)
+
+lookahead :: (Stream s, Monoid e) => Parser e s a -> Parser e s a
+lookahead (MkParser p) = MkParser $ \inp ->
+  case p inp of
+    Left err -> Left err
+    Right (res, _) -> Right (res, inp)
 
 -- | Consume all characters uing the first parser until the second
 -- parser succeeds

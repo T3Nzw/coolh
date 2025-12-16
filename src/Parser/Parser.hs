@@ -13,6 +13,7 @@ module Parser.Parser
     mkClass,
     notype,
     treefmt,
+    astfmt, -- TODO: remove
     noexpr,
     astpos,
     selfObj,
@@ -38,13 +39,13 @@ data MProgram
   }
 
 data Typeid = Typeid ByteString | NoType
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 notype :: Typeid
 notype = NoType
 
 newtype Objectid = Objectid ByteString
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 data Program = Program (NonEmpty Class) SourcePos
   deriving (Show)
@@ -64,20 +65,20 @@ mkClass (Just inherited) (ClassInherits iden _ feats fp sp) =
 data Feature
   = Method Objectid [Formal] Typeid AST SourcePos
   | Field Objectid Typeid AST SourcePos
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 -- useful for the ast.
 
 data Formal = Arg Objectid Typeid SourcePos
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 -- NOTE: might need source pos?
 
 data Binding = Binding Objectid Typeid AST
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 data PatternMatch = PMatch Objectid Typeid AST SourcePos
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 -- AST
 -- TODO: just inject the source pos directly into each node...
@@ -101,6 +102,11 @@ data AST
   | Leq Typeid AST AST SourcePos
   | Eq Typeid AST AST SourcePos
   | Not Typeid AST SourcePos -- ok
+  -- TODO: remove this constructor eventually.
+  -- i don't actually need it as of now, but if i were to remove it,
+  -- i would need a setter for the source pos of an AST node,
+  -- which is way too much boilerplate without lens/generics,
+  -- so postponing this to a later stage. shouldn't cause any problems as is
   | Parenthesised AST SourcePos -- ok
   | StaticDispatch Typeid AST Typeid Objectid [AST] SourcePos
   | Dispatch Typeid AST Objectid [AST] SourcePos
@@ -109,7 +115,7 @@ data AST
   | Str Typeid Objectid SourcePos -- ok
   | Boolean Typeid Objectid SourcePos -- ok
   | NoExpr Typeid SourcePos
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 -- TODO: use generics
 astpos :: AST -> SourcePos
@@ -407,12 +413,13 @@ astfmt indent (Number ty iden pos) =
         ++ indent
         ++ ":"
         ++ typefmt " " ty
-astfmt indent (Str ty iden pos) =
+astfmt indent (Str ty (Objectid iden) pos) =
   let indent' = idInc indent
    in posfmt indent pos
         ++ astnode indent "_str"
         ++ newline
-        ++ show (objectfmt indent' iden)
+        ++ indent'
+        ++ show iden
         ++ newline
         ++ indent
         ++ ":"
@@ -422,7 +429,7 @@ astfmt indent (Boolean ty iden pos) =
    in posfmt indent pos
         ++ astnode indent "_bool"
         ++ newline
-        ++ show (objectfmt indent' iden)
+        ++ objectfmt indent' iden
         ++ newline
         ++ indent
         ++ ":"

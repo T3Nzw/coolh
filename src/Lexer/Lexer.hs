@@ -50,7 +50,7 @@ data LexemeTag
   | COMMENT -- makes parsing easier
   | EOF
   | ERR Error
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Lexeme = Lexeme LexemeTag (Maybe ByteString)
 

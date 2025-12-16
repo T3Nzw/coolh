@@ -23,7 +23,9 @@ cabal.project.local~
 .ghc.environment.*
 notes/
 tests/
-out/
 debug/
 resources.txt
 github-repo.txt
+out/
+parser_tests/
+semantics_tests/

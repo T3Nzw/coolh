@@ -3,7 +3,7 @@ module Parser.Position where
 import Control.Lens (makeLenses)
 
 data SourcePos = SourcePos {_absOffset :: Int, _lineNumber :: Int, _colNumber :: Int, _tabWidth :: Int}
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 data State s = State {_input :: s, _pos :: SourcePos}
   deriving (Show)

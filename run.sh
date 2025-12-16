@@ -6,13 +6,13 @@ cabal build coolh.cabal
 
 # Modify both input (test_dir) and output (out_dir)
 # directories as needed
-target_dir="./tests/parser"
-out_dir="./out/parser"
+target_dir="./parser_tests/in"
+out_dir="./parser_tests/out"
 
 flag=$1
 
 for f in ${target_dir}/*; do
-  echo "Running lexer for $f"
+  echo "Running parser for $f"
   filename="$(basename $f .in)"
   # Run the project for each file in the test_dir directory.
   # Will eventually need to modify it so that you can pass
