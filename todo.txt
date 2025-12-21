@@ -12,6 +12,25 @@ TODO:
                  SEMANTIC ANALYSER
 *****************************************************
 
+[x] typechecking for Parenthesised
+
+[] fix typechecking for equal (needs to support all atomic types)
+
+[] typechecking for static and dynamic dispatch
+
+[] typechecking for NoExpr (this might be a let/attr thing?)
+
+[] typechecking for CaseOf
+
+[] typechecking for Let (might need to modify the tree)
+
+[] typechecking for methods
+
+[] typechecking for attributes
+
+[] typechecking for classes (occurs-check)
+
+[] SELF_TYPE stuff
 
 *****************************************************
                       PARSER
@@ -19,7 +38,7 @@ TODO:
 
 [] operator precedence
 
-[] nested lets (perhaps just in outputting? storing them as nested lets seems suboptimal)
+[] nested lets
 
 [] error handling
 

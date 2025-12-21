@@ -1,7 +1,7 @@
 module Semantic.Typecheck where
 
+import Control.Lens (makeLenses, over)
 import Control.Monad.State
-import Data.BSUtil (string8)
 import qualified Data.ByteString as B
 import Data.ByteString.Char8
 import Data.List (intersect)
@@ -38,6 +38,8 @@ data Context
     _className :: ClassName
   }
 
+makeLenses ''Context
+
 builinClasses :: ClassEnv
 builinClasses =
   M.fromList
@@ -62,6 +64,13 @@ lub' cenv (c : cs) = ancestors cenv c `intersect` lub' cenv cs
 lub :: ClassEnv -> [ClassName] -> ClassName
 lub cenv cs = Prelude.head $ lub' cenv cs
 
+isSubtypeOf :: ClassEnv -> ClassName -> ClassName -> Bool
+isSubtypeOf cenv c1 c2 = c2 `Prelude.elem` lub' cenv [c1, c2]
+
+-- TODO: do some form of an occurs-check for subtyping.
+-- this should probably happen when creating a new class
+-- (hence inheriting) and should be dependent on the context
+
 emptyCtx :: ClassName -> Context
 emptyCtx = Context M.empty M.empty builinClasses
 
@@ -84,82 +93,114 @@ propTypedExpr ty ret ctor (TypedExpr ty1 val1) (TypedExpr ty2 val2) =
       pure $ TypedExpr ret $ ctor val1 val2
     _ -> Left TypeMismatch
 
-typecheck :: Context -> AST -> Either TypeError TypedExpr
-typecheck ctx' expr = evalStateT (typecheck' expr) ctx'
+typecheckAST :: Context -> AST -> Either TypeError TypedExpr
+typecheckAST ctx' expr = evalStateT (typecheckAST' expr) ctx'
   where
-    typecheck' :: AST -> StateT Context (Either TypeError) TypedExpr
-    typecheck' (Number _ (Objectid x) _) = pure $ TypedExpr NumberType (TNumber . fst . fromJust $ readInt x)
-    typecheck' (Boolean _ (Objectid b) _) = pure $ TypedExpr BooleanType (TBoolean $ readBool b)
-    typecheck' (Str _ (Objectid str) _) = pure $ TypedExpr StringType (TStr str)
-    typecheck' (Id _ iden@(Objectid x) _) = do
+    typecheckAST' :: AST -> StateT Context (Either TypeError) TypedExpr
+    typecheckAST' (Number _ (Objectid x) _) = pure $ TypedExpr NumberType (TNumber . fst . fromJust $ readInt x)
+    typecheckAST' (Boolean _ (Objectid b) _) = pure $ TypedExpr BooleanType (TBoolean $ readBool b)
+    typecheckAST' (Str _ (Objectid str) _) = pure $ TypedExpr StringType (TStr str)
+    typecheckAST' (Id _ iden@(Objectid x) _) = do
       ctx <- get
       case M.lookup iden (_objectEnv ctx) of
         Nothing -> lift $ Left $ UndeclaredIdentifier x
         Just expr' -> pure expr'
+    typecheckAST' (Assign _ iden@(Objectid x) ast _) = do
+      ctx <- get
+      case M.lookup iden (_objectEnv ctx) of
+        Nothing -> lift $ Left $ UndeclaredIdentifier x
+        Just texpr -> do
+          ast' <- typecheckAST' ast
+          let subty = getType ast'
+          let ty = getType texpr
+          if isSubtypeOf (_classEnv ctx) subty ty
+            then pure ast'
+            else lift $ Left $ IsNotSubtypeOf subty ty
+    typecheckAST' (Parenthesised ast _) = typecheckAST' ast
     -- failed to think of a one-liner... i suck at working with transformers
-    typecheck' (Add _ lhs rhs _) = do
-      lhs' <- typecheck' lhs
-      rhs' <- typecheck' rhs
+    typecheckAST' (Add _ lhs rhs _) = do
+      lhs' <- typecheckAST' lhs
+      rhs' <- typecheckAST' rhs
       lift $ propTypedExpr NumberType NumberType TAdd lhs' rhs'
-    typecheck' (Sub _ lhs rhs _) = do
-      lhs' <- typecheck' lhs
-      rhs' <- typecheck' rhs
+    typecheckAST' (Sub _ lhs rhs _) = do
+      lhs' <- typecheckAST' lhs
+      rhs' <- typecheckAST' rhs
       lift $ propTypedExpr NumberType NumberType TSub lhs' rhs'
-    typecheck' (Mul _ lhs rhs _) = do
-      lhs' <- typecheck' lhs
-      rhs' <- typecheck' rhs
+    typecheckAST' (Mul _ lhs rhs _) = do
+      lhs' <- typecheckAST' lhs
+      rhs' <- typecheckAST' rhs
       lift $ propTypedExpr NumberType NumberType TMul lhs' rhs'
-    typecheck' (Div _ lhs rhs _) = do
-      lhs' <- typecheck' lhs
-      rhs' <- typecheck' rhs
+    typecheckAST' (Div _ lhs rhs _) = do
+      lhs' <- typecheckAST' lhs
+      rhs' <- typecheckAST' rhs
       lift $ propTypedExpr NumberType NumberType TDiv lhs' rhs'
-    typecheck' (Lt _ lhs rhs _) = do
-      lhs' <- typecheck' lhs
-      rhs' <- typecheck' rhs
+    typecheckAST' (Lt _ lhs rhs _) = do
+      lhs' <- typecheckAST' lhs
+      rhs' <- typecheckAST' rhs
       lift $ propTypedExpr NumberType BooleanType TLt lhs' rhs'
-    typecheck' (Leq _ lhs rhs _) = do
-      lhs' <- typecheck' lhs
-      rhs' <- typecheck' rhs
+    typecheckAST' (Leq _ lhs rhs _) = do
+      lhs' <- typecheckAST' lhs
+      rhs' <- typecheckAST' rhs
       lift $ propTypedExpr NumberType BooleanType TLeq lhs' rhs'
-    typecheck' (Eq _ lhs rhs _) = do
-      lhs' <- typecheck' lhs
-      rhs' <- typecheck' rhs
+    typecheckAST' (Eq _ lhs rhs _) = do
+      lhs' <- typecheckAST' lhs
+      rhs' <- typecheckAST' rhs
       lift $ propTypedExpr NumberType BooleanType TEq lhs' rhs'
-    typecheck' (Tilda _ ast _) = do
-      TypedExpr ty ast' <- typecheck' ast
+    typecheckAST' (Tilda _ ast _) = do
+      TypedExpr ty ast' <- typecheckAST' ast
       case ty of
         NumberType -> pure $ TypedExpr NumberType (TTilda ast')
         _ -> lift $ Left TypeMismatch
-    typecheck' (Not _ ast _) = do
-      TypedExpr ty ast' <- typecheck' ast
+    typecheckAST' (Not _ ast _) = do
+      TypedExpr ty ast' <- typecheckAST' ast
       case ty of
         BooleanType -> pure $ TypedExpr BooleanType (TNot ast')
         _ -> lift $ Left TypeMismatch
-    typecheck' (IsVoid _ ast _) = do
-      TypedExpr ty ast' <- typecheck' ast
+    typecheckAST' (IsVoid _ ast _) = do
+      TypedExpr _ ast' <- typecheckAST' ast
       pure $ TypedExpr BooleanType (TIsVoid ast')
-    typecheck' (New _ (Typeid ty) _) = pure $ TypedExpr (TypeVar ty) (TNew ty)
-    typecheck' (Statement _ ne _) = do
+    typecheckAST' (New _ (Typeid ty) _) = pure $ TypedExpr (TypeVar ty) (TNew ty)
+    typecheckAST' (Statement _ ne _) = do
       let lst = NE.toList ne
-      res <- mapM typecheck' lst
+      res <- mapM typecheckAST' lst
       let seq = Prelude.init res
       let seqLast = Prelude.last res
       case seqLast of
         TypedExpr ty _ -> pure $ TypedExpr ty (TStatement seq seqLast)
-        _ -> error "this is unreachable BUT HOW TF DID THIS EVEN WORK? man haskell is magical"
-    typecheck' (IfThenElse _ b t f _) = do
-      TypedExpr condty cond <- typecheck' b
-      true <- typecheck' t
-      false <- typecheck' f
+    typecheckAST' (IfThenElse _ b t f _) = do
+      TypedExpr condty cond <- typecheckAST' b
+      true <- typecheckAST' t
+      false <- typecheckAST' f
       case condty of
         BooleanType -> do
           ctx <- get
           let tfLub = lub (_classEnv ctx) [getType true, getType false]
           pure $ TypedExpr (TypeVar tfLub) (TIfThenElse cond true false)
         _ -> lift $ Left TypeMismatch
-    typecheck' (WhileLoop _ c b _) = do
-      TypedExpr condty cond <- typecheck' c
-      body <- typecheck' b
+    typecheckAST' (WhileLoop _ c b _) = do
+      TypedExpr condty cond <- typecheckAST' c
+      body <- typecheckAST' b
       case condty of
         BooleanType -> pure $ TypedExpr VoidType (TWhileLoop cond body)
         _ -> lift $ Left TypeMismatch
+    typecheckAST' (LetNoInit _ (obj@(Objectid iden), Typeid ty) body _) = do
+      ctx <- get
+      let ty' = if ty == "SELF_TYPE" then _className ctx else ty
+      -- modify env
+      let typedBinding = TypedExpr (TypeVar ty') (TId iden)
+      modify (over objectEnv (M.insert obj typedBinding))
+      TypedExpr bty body' <- typecheckAST' body
+      -- rollback
+      _ <- put ctx
+      pure $ TypedExpr bty (TLetNoInit (iden, TypeVar ty') body')
+
+typecheckFeature :: Context -> Feature -> Either TypedExpr a
+typecheckFeature = undefined
+
+-- TODO: caseof, letinit, letnoinit, static dispatch, dynamic dispatch, attributes, methods
+
+class Typeable a atyped | a -> atyped where
+  typeof :: Context -> a -> Either TypeError atyped
+
+instance Typeable AST TypedExpr where
+  typeof = typecheckAST

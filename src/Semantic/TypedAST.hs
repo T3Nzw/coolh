@@ -12,15 +12,23 @@ import Data.List.NonEmpty (NonEmpty, toList)
 
 data Void -- lmao
 
+data Self
+
 data Type ty where
   VoidType :: Type Void
+  SelfType :: Type Self
   NumberType :: Type Int
   BooleanType :: Type Bool
   StringType :: Type B.ByteString
   TypeVar :: B.ByteString -> Type B.ByteString
 
+-- need an existential wrapper
+data WrappedType where
+  WrappedType :: Type ty -> WrappedType
+
 instance Show (Type ty) where
   show VoidType = "Void"
+  show SelfType = "Self"
   show NumberType = "Int"
   show BooleanType = "Bool"
   show StringType = "String"
@@ -32,6 +40,7 @@ data TypedAST ty where
   TBoolean :: Bool -> TypedAST Bool
   TStr :: B.ByteString -> TypedAST B.ByteString
   TId :: B.ByteString -> TypedAST B.ByteString
+  TAssign :: TypedExpr -> TypedAST ty -> TypedAST ty
   TAdd :: TypedAST Int -> TypedAST Int -> TypedAST Int
   TSub :: TypedAST Int -> TypedAST Int -> TypedAST Int
   TMul :: TypedAST Int -> TypedAST Int -> TypedAST Int
@@ -47,12 +56,14 @@ data TypedAST ty where
   TIfThenElse :: TypedAST Bool -> TypedExpr -> TypedExpr -> TypedAST ty
   TWhileLoop :: TypedAST Bool -> TypedExpr -> TypedAST Void
   TCaseOf :: TypedAST ty0 -> NonEmpty (TypedAST ty) -> TypedAST ty
+  TLetNoInit :: (B.ByteString, Type ty0) -> TypedAST ty1 -> TypedAST ty1
+  TLetInit :: (B.ByteString, Type t0, TypedAST ty0) -> TypedAST ty1 -> TypedAST ty1
 
 instance Show (TypedAST ty) where
   show (TNumber n) = show n
   show (TBoolean b) = show b
   show (TStr s) = show s
-  show (TId x) = show x
+  show (TId x) = bytesToString x
   show (TAdd a b) = "(" ++ show a ++ " + " ++ show b ++ ")"
   show (TSub a b) = "(" ++ show a ++ " - " ++ show b ++ ")"
   show (TMul a b) = "(" ++ show a ++ " * " ++ show b ++ ")"
@@ -72,8 +83,19 @@ instance Show (TypedAST ty) where
     "while " ++ show c ++ " loop " ++ show b ++ " pool"
   show (TCaseOf e cases) =
     "case " ++ show e ++ " of " ++ show (toList cases) ++ " esac"
+  show (TLetNoInit (iden, ty) body) =
+    "let " ++ bytesToString iden ++ ":" ++ show ty ++ " in " ++ show body
+  show (TLetInit (iden, ty, expr) body) =
+    "let "
+      ++ bytesToString iden
+      ++ ":"
+      ++ show ty
+      ++ " <- "
+      ++ show expr
+      ++ " in "
+      ++ show body
 
--- TODO: assign, let, new, static and dynamic dispatch, noexpr
+-- TODO: let, new, static and dynamic dispatch, noexpr, caseof
 
 data TypedExpr where
   TypedExpr :: Type ty -> TypedAST ty -> TypedExpr
@@ -84,6 +106,16 @@ instance Show TypedExpr where
 getType :: TypedExpr -> ByteString
 getType (TypedExpr ty _) = string8 $ show ty
 
+toType :: ByteString -> WrappedType
+toType "Void" = WrappedType VoidType
+toType "Self" = WrappedType SelfType
+toType "Bool" = WrappedType BooleanType
+toType "Int" = WrappedType NumberType
+toType "String" = WrappedType StringType
+toType typename = WrappedType $ TypeVar typename
+
 -- WHAT THE FUCK
 mapTE :: (forall ty. Type ty -> Type ty) -> (forall ty. TypedAST ty -> TypedAST ty) -> TypedExpr -> TypedExpr
 mapTE ft fa (TypedExpr ty ast) = TypedExpr (ft ty) (fa ast)
+
+data TypedFeature ty

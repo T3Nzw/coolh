@@ -89,7 +89,8 @@ data AST
   | IfThenElse Typeid AST AST AST SourcePos -- ok
   | WhileLoop Typeid AST AST SourcePos -- ok
   | Statement Typeid (NonEmpty AST) SourcePos -- ok
-  | LetIn Typeid (NonEmpty Binding) AST SourcePos -- ok
+  | LetInit Typeid (Objectid, Typeid, AST) AST SourcePos
+  | LetNoInit Typeid (Objectid, Typeid) AST SourcePos
   | CaseOf Typeid AST (NonEmpty PatternMatch) SourcePos
   | New Typeid Typeid SourcePos -- ok
   | IsVoid Typeid AST SourcePos -- ok
@@ -124,7 +125,8 @@ astpos = \case
   IfThenElse _ _ _ _ p -> p
   WhileLoop _ _ _ p -> p
   Statement _ _ p -> p
-  LetIn _ _ _ p -> p
+  LetInit _ _ _ p -> p
+  LetNoInit _ _ _ p -> p
   CaseOf _ _ _ p -> p
   New _ _ p -> p
   IsVoid _ _ p -> p
@@ -205,18 +207,18 @@ astfmt indent (Statement ty asts pos) =
         ++ typefmt " " ty
 -- TODO: this is more complex than i thought.
 -- they're treated as nested let bindings...
-astfmt indent (LetIn ty binds body pos) =
-  let indent' = idInc indent
-   in posfmt indent pos
-        ++ astnode indent "_let"
-        ++ newline
-        ++ intercalate newline (map (bindfmt indent') $ toList binds)
-        ++ newline
-        ++ astfmt indent' body
-        ++ newline
-        ++ indent
-        ++ ":"
-        ++ typefmt " " ty
+-- astfmt indent (LetIn ty binds body pos) =
+-- let indent' = idInc indent
+-- in posfmt indent pos
+-- ++ astnode indent "_let"
+-- ++ newline
+-- ++ intercalate newline (map (bindfmt indent') $ toList binds)
+-- ++ newline
+-- ++ astfmt indent' body
+-- ++ newline
+-- ++ indent
+-- ++ ":"
+-- ++ typefmt " " ty
 astfmt indent (CaseOf ty ast pms pos) =
   let indent' = idInc indent
    in posfmt indent pos

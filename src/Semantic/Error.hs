@@ -6,5 +6,6 @@ data TypeError
   = TypeMismatch
   | SubtypingLoop
   | ExprHasNoType
+  | IsNotSubtypeOf ByteString ByteString
   | UndeclaredIdentifier ByteString
   deriving (Show)

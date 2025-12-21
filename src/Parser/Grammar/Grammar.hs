@@ -72,6 +72,7 @@ class' fp = do
 
 -- feature
 
+-- | one or more comma-separated values
 commaSep :: P.Parser String Lexemes a -> P.Parser String Lexemes (NonEmpty a)
 commaSep p = do
   x <- p
@@ -227,13 +228,30 @@ statement = do
   pos <- extractPos <$> lsat L.RBRACE
   pure $ Statement notype res pos
 
+bind :: P.Parser String Lexemes (Objectid, Typeid, Maybe AST, SourcePos)
+bind = do
+  iden <- objp
+  _ <- lsat L.COLON
+  noinitPos <- extractPos <$> P.peek
+  ty <- typp
+  expr <- P.zeroOrOne $ lsat L.ASSIGN >> ast
+  pure $ case expr of
+    Nothing -> (iden, ty, expr, noinitPos)
+    Just expr' -> (iden, ty, expr, astpos expr')
+
+-- a wrapper for let expressions
 letin :: P.Parser String Lexemes AST
 letin = do
   _ <- lsat L.LET
-  binds <- commaSep binding
+  binds <- commaSep bind
   _ <- lsat L.IN
-  res <- ast
-  pure $ LetIn notype binds res $ astpos res
+  body <- ast
+  pure $ foldr buildAST body binds
+  where
+    buildAST (iden, ty, Just expr, sp) xs =
+      LetInit notype (iden, ty, expr) xs sp
+    buildAST (iden, ty, Nothing, sp) xs =
+      LetNoInit notype (iden, ty) xs sp
 
 caseof :: P.Parser String Lexemes AST
 caseof = do

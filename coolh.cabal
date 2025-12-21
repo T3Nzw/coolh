@@ -51,7 +51,9 @@ executable coolh
                         GADTs,
                         DataKinds,
                         TypeOperators,
-                        StandaloneDeriving
+                        StandaloneDeriving,
+                        MultiParamTypeClasses,
+                        FunctionalDependencies
 
     build-depends:      base ^>=4.18.3.0,
                         bytestring,
