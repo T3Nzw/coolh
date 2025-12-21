@@ -16,7 +16,7 @@ createAST s = case runParser ast $ initial $ lexer s of
   Right (tree, _) -> tree
 
 typeofAST :: AST -> Either TypeError TypedExpr
-typeofAST = typecheckAST (emptyCtx "some class here")
+typeofAST = typecheckAST (emptyCtx $ TypeVar "Foo")
 
 typeof :: ByteString -> Either TypeError TypedExpr
 typeof = typeofAST . createAST

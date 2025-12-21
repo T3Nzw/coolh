@@ -9,26 +9,19 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Maybe (fromJust)
 import Data.Type.Equality ((:~:) (..))
+import Debug.Trace (trace)
 import Parser.Parser
 import Semantic.Error
 import Semantic.TypedAST
 
-eqType :: Type a -> Type b -> Maybe (a :~: b)
-eqType VoidType VoidType = Just Refl
-eqType NumberType NumberType = Just Refl
-eqType BooleanType BooleanType = Just Refl
-eqType StringType StringType = Just Refl
-eqType (TypeVar var1) (TypeVar var2) = if var1 == var2 then Just Refl else Nothing
-eqType _ _ = Nothing
-
 -- talk about a suboptimal representation
-type ObjectEnv = M.Map Objectid TypedExpr -- ?
+type ObjectEnv = M.Map Objectid Type -- ?
 
-type MethodEnv = M.Map Feature TypedExpr -- ?
+type MethodEnv = M.Map Feature Type -- ?
 
-type ClassEnv = M.Map ClassName (Maybe ClassName)
+type ClassEnv = M.Map Type (Maybe Type)
 
-type ClassName = B.ByteString
+type ClassName = Type
 
 data Context
   = Context
@@ -37,17 +30,18 @@ data Context
     _classEnv :: ClassEnv,
     _className :: ClassName
   }
+  deriving (Show)
 
 makeLenses ''Context
 
 builinClasses :: ClassEnv
 builinClasses =
   M.fromList
-    [ ("Object", Nothing),
-      ("IO", Just "Object"),
-      ("Int", Just "Object"),
-      ("Bool", Just "Object"),
-      ("String", Just "Object")
+    [ (ObjectType, Nothing),
+      (IOType, Just ObjectType),
+      (NumberType, Just ObjectType),
+      (BooleanType, Just ObjectType),
+      (StringType, Just ObjectType)
     ]
 
 ancestors :: ClassEnv -> ClassName -> [ClassName]
@@ -79,19 +73,16 @@ readBool "false" = False
 readBool "true" = True
 readBool _ = error "this should never happen"
 
--- this was a mistake.
-propTypedExpr ::
-  Type ty ->
-  Type ret ->
-  (TypedAST ty -> TypedAST ty -> TypedAST ret) ->
-  TypedExpr ->
-  TypedExpr ->
-  Either TypeError TypedExpr
-propTypedExpr ty ret ctor (TypedExpr ty1 val1) (TypedExpr ty2 val2) =
-  case (eqType ty ty1, eqType ty ty2) of
-    (Just Refl, Just Refl) ->
-      pure $ TypedExpr ret $ ctor val1 val2
-    _ -> Left TypeMismatch
+expect :: Type -> (TypedExpr -> TypedExpr -> TypedAST) -> Type -> Type -> TypedExpr -> TypedExpr -> Either TypeError TypedExpr
+expect ret ctor ty1 ty2 expr1 expr2
+  | ty1 == getType expr1 && ty2 == getType expr2 = Right $ TypedExpr ret $ ctor expr1 expr2
+  | otherwise = Left $ TypeMismatch expr1 expr2
+
+liftIntermediate :: (MonadTrans t, Monad m) => (a -> a -> m a) -> t m a -> t m a -> t m a
+liftIntermediate f st1 st2 = do
+  l <- st1
+  r <- st2
+  lift $ f l r
 
 typecheckAST :: Context -> AST -> Either TypeError TypedExpr
 typecheckAST ctx' expr = evalStateT (typecheckAST' expr) ctx'
@@ -104,114 +95,98 @@ typecheckAST ctx' expr = evalStateT (typecheckAST' expr) ctx'
       ctx <- get
       case M.lookup iden (_objectEnv ctx) of
         Nothing -> lift $ Left $ UndeclaredIdentifier x
-        Just expr' -> pure expr'
+        Just ty -> pure $ TypedExpr ty (TId x)
     typecheckAST' (Assign _ iden@(Objectid x) ast _) = do
       ctx <- get
       case M.lookup iden (_objectEnv ctx) of
         Nothing -> lift $ Left $ UndeclaredIdentifier x
-        Just texpr -> do
+        Just ty -> do
           ast' <- typecheckAST' ast
           let subty = getType ast'
-          let ty = getType texpr
           if isSubtypeOf (_classEnv ctx) subty ty
             then pure ast'
-            else lift $ Left $ IsNotSubtypeOf subty ty
+            else lift $ Left $ IsNotSubtypeOf ast' (TypedExpr ty $ TId x)
     typecheckAST' (Parenthesised ast _) = typecheckAST' ast
-    -- failed to think of a one-liner... i suck at working with transformers
-    typecheckAST' (Add _ lhs rhs _) = do
-      lhs' <- typecheckAST' lhs
-      rhs' <- typecheckAST' rhs
-      lift $ propTypedExpr NumberType NumberType TAdd lhs' rhs'
-    typecheckAST' (Sub _ lhs rhs _) = do
-      lhs' <- typecheckAST' lhs
-      rhs' <- typecheckAST' rhs
-      lift $ propTypedExpr NumberType NumberType TSub lhs' rhs'
-    typecheckAST' (Mul _ lhs rhs _) = do
-      lhs' <- typecheckAST' lhs
-      rhs' <- typecheckAST' rhs
-      lift $ propTypedExpr NumberType NumberType TMul lhs' rhs'
-    typecheckAST' (Div _ lhs rhs _) = do
-      lhs' <- typecheckAST' lhs
-      rhs' <- typecheckAST' rhs
-      lift $ propTypedExpr NumberType NumberType TDiv lhs' rhs'
-    typecheckAST' (Lt _ lhs rhs _) = do
-      lhs' <- typecheckAST' lhs
-      rhs' <- typecheckAST' rhs
-      lift $ propTypedExpr NumberType BooleanType TLt lhs' rhs'
-    typecheckAST' (Leq _ lhs rhs _) = do
-      lhs' <- typecheckAST' lhs
-      rhs' <- typecheckAST' rhs
-      lift $ propTypedExpr NumberType BooleanType TLeq lhs' rhs'
+    typecheckAST' (Add _ lhs rhs _) =
+      liftIntermediate (expect NumberType TAdd NumberType NumberType) (typecheckAST' lhs) (typecheckAST' rhs)
+    typecheckAST' (Sub _ lhs rhs _) =
+      liftIntermediate (expect NumberType TSub NumberType NumberType) (typecheckAST' lhs) (typecheckAST' rhs)
+    typecheckAST' (Mul _ lhs rhs _) =
+      liftIntermediate (expect NumberType TMul NumberType NumberType) (typecheckAST' lhs) (typecheckAST' rhs)
+    typecheckAST' (Div _ lhs rhs _) =
+      liftIntermediate (expect NumberType TDiv NumberType NumberType) (typecheckAST' lhs) (typecheckAST' rhs)
+    typecheckAST' (Lt _ lhs rhs _) =
+      liftIntermediate (expect BooleanType TLt NumberType NumberType) (typecheckAST' lhs) (typecheckAST' rhs)
+    typecheckAST' (Leq _ lhs rhs _) =
+      liftIntermediate (expect BooleanType TLeq NumberType NumberType) (typecheckAST' lhs) (typecheckAST' rhs)
     typecheckAST' (Eq _ lhs rhs _) = do
       lhs' <- typecheckAST' lhs
       rhs' <- typecheckAST' rhs
-      lift $ propTypedExpr NumberType BooleanType TEq lhs' rhs'
+      if eqType lhs' rhs' && getType lhs' `Prelude.elem` [NumberType, BooleanType, StringType]
+        then pure $ TypedExpr BooleanType (TEq lhs' rhs')
+        else lift $ Left $ TypeMismatch lhs' rhs'
     typecheckAST' (Tilda _ ast _) = do
-      TypedExpr ty ast' <- typecheckAST' ast
-      case ty of
-        NumberType -> pure $ TypedExpr NumberType (TTilda ast')
-        _ -> lift $ Left TypeMismatch
+      ast' <- typecheckAST' ast
+      if getType ast' == NumberType
+        then pure $ TypedExpr NumberType $ TTilda ast'
+        else lift $ Left $ ExpectedTypeInExprButGot NumberType ast'
     typecheckAST' (Not _ ast _) = do
-      TypedExpr ty ast' <- typecheckAST' ast
-      case ty of
-        BooleanType -> pure $ TypedExpr BooleanType (TNot ast')
-        _ -> lift $ Left TypeMismatch
+      ast' <- typecheckAST' ast
+      if getType ast' == BooleanType
+        then pure $ TypedExpr BooleanType $ TNot ast'
+        else lift $ Left $ ExpectedTypeInExprButGot BooleanType ast'
     typecheckAST' (IsVoid _ ast _) = do
-      TypedExpr _ ast' <- typecheckAST' ast
-      pure $ TypedExpr BooleanType (TIsVoid ast')
-    typecheckAST' (New _ (Typeid ty) _) = pure $ TypedExpr (TypeVar ty) (TNew ty)
+      expr <- typecheckAST' ast
+      pure $ TypedExpr BooleanType $ TIsVoid expr
+    typecheckAST' (New _ (Typeid ty) _) = pure $ TypedExpr (toType ty) (TNew ty)
     typecheckAST' (Statement _ ne _) = do
       let lst = NE.toList ne
       res <- mapM typecheckAST' lst
       let seq = Prelude.init res
       let seqLast = Prelude.last res
-      case seqLast of
-        TypedExpr ty _ -> pure $ TypedExpr ty (TStatement seq seqLast)
+      pure $ TypedExpr (getType seqLast) $ TStatement seq seqLast
     typecheckAST' (IfThenElse _ b t f _) = do
-      TypedExpr condty cond <- typecheckAST' b
+      cond <- typecheckAST' b
       true <- typecheckAST' t
       false <- typecheckAST' f
-      case condty of
+      case getType cond of
         BooleanType -> do
           ctx <- get
-          let tfLub = lub (_classEnv ctx) [getType true, getType false]
-          pure $ TypedExpr (TypeVar tfLub) (TIfThenElse cond true false)
-        _ -> lift $ Left TypeMismatch
+          let tflub = lub (_classEnv ctx) [getType true, getType false]
+          pure $ TypedExpr tflub $ TIfThenElse cond true false
+        _ -> lift $ Left $ ExpectedTypeInExprButGot BooleanType cond
     typecheckAST' (WhileLoop _ c b _) = do
-      TypedExpr condty cond <- typecheckAST' c
+      cond <- typecheckAST' c
       body <- typecheckAST' b
-      case condty of
+      case getType cond of
         BooleanType -> pure $ TypedExpr VoidType (TWhileLoop cond body)
-        _ -> lift $ Left TypeMismatch
-    typecheckAST' (LetNoInit _ (obj@(Objectid iden), Typeid ty) body _) = do
+        _ -> lift $ Left $ ExpectedTypeInExprButGot BooleanType cond
+    typecheckAST' (LetNoInit _ (obj@(Objectid iden), Typeid tyid) body _) = do
       ctx <- get
-      let ty' = if ty == "SELF_TYPE" then _className ctx else ty
-      -- modify env
-      let typedBinding = TypedExpr (TypeVar ty') (TId iden)
-      modify (over objectEnv (M.insert obj typedBinding))
-      TypedExpr bty body' <- typecheckAST' body
+      let ty = toType tyid
+      let ty' = if ty == SelfType then _className ctx else ty
+      modify (over objectEnv (M.insert obj ty'))
+      body' <- typecheckAST' body
       -- rollback
       _ <- put ctx
-      pure $ TypedExpr bty (TLetNoInit (iden, TypeVar ty) body')
-    typecheckAST' (LetInit _ (obj@(Objectid iden), Typeid ty, expr) body _) = do
+      pure $ TypedExpr (getType body') $ TLetNoInit (iden, ty) body'
+    typecheckAST' (LetInit _ (obj@(Objectid iden), Typeid tyid, expr) body _) = do
       ctx <- get
-      let ty' = if ty == "SELF_TYPE" then _className ctx else ty
-      e@(TypedExpr ety expr') <- typecheckAST' expr
-      let etyS = getType e
-      -- modify env
-      let typedBinding = TypedExpr (TypeVar ty') (TId iden)
-      modify (over objectEnv (M.insert obj typedBinding))
-      TypedExpr bty body' <- typecheckAST' body
+      let ty = toType tyid
+      let ty' = if ty == SelfType then _className ctx else ty
+      expr' <- typecheckAST' expr
+      modify (over objectEnv (M.insert obj ty'))
+      body' <- typecheckAST' body
       -- rollback
       _ <- put ctx
-      if isSubtypeOf (_classEnv ctx) etyS ty'
-        then pure $ TypedExpr bty (TLetInit (iden, TypeVar ty, e) body')
-        else lift $ Left $ IsNotSubtypeOf etyS ty'
+      if isSubtypeOf (_classEnv ctx) (getType expr') ty'
+        then pure $ TypedExpr (getType body') $ TLetInit (iden, ty', expr') body'
+        else undefined
 
 typecheckFeature :: Context -> Feature -> Either TypedExpr a
 typecheckFeature = undefined
 
--- TODO: caseof, letinit, letnoinit, static dispatch, dynamic dispatch, attributes, methods
+-- TODO: caseof, static dispatch, dynamic dispatch, attributes, methods
 
 class Typeable a atyped | a -> atyped where
   typeof :: Context -> a -> Either TypeError atyped
