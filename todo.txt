@@ -32,6 +32,14 @@ TODO:
 
 [] SELF_TYPE stuff
 
+[] proper conversion of inferred types to their respective
+   ADT representation. for example, lub [<some_types>]
+   returns a ByteString, which is not ideal since
+   the lub might happen to be Int, which is represented
+   as NumberType internally. this might cause problems
+   where comparison of types is needed. not sure how to
+   properly do it due to existential type variables...
+
 *****************************************************
                       PARSER
 *****************************************************

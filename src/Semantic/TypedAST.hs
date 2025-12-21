@@ -57,7 +57,7 @@ data TypedAST ty where
   TWhileLoop :: TypedAST Bool -> TypedExpr -> TypedAST Void
   TCaseOf :: TypedAST ty0 -> NonEmpty (TypedAST ty) -> TypedAST ty
   TLetNoInit :: (B.ByteString, Type ty0) -> TypedAST ty1 -> TypedAST ty1
-  TLetInit :: (B.ByteString, Type t0, TypedAST ty0) -> TypedAST ty1 -> TypedAST ty1
+  TLetInit :: (B.ByteString, Type t0, TypedExpr) -> TypedAST ty1 -> TypedAST ty1
 
 instance Show (TypedAST ty) where
   show (TNumber n) = show n

@@ -192,7 +192,21 @@ typecheckAST ctx' expr = evalStateT (typecheckAST' expr) ctx'
       TypedExpr bty body' <- typecheckAST' body
       -- rollback
       _ <- put ctx
-      pure $ TypedExpr bty (TLetNoInit (iden, TypeVar ty') body')
+      pure $ TypedExpr bty (TLetNoInit (iden, TypeVar ty) body')
+    typecheckAST' (LetInit _ (obj@(Objectid iden), Typeid ty, expr) body _) = do
+      ctx <- get
+      let ty' = if ty == "SELF_TYPE" then _className ctx else ty
+      e@(TypedExpr ety expr') <- typecheckAST' expr
+      let etyS = getType e
+      -- modify env
+      let typedBinding = TypedExpr (TypeVar ty') (TId iden)
+      modify (over objectEnv (M.insert obj typedBinding))
+      TypedExpr bty body' <- typecheckAST' body
+      -- rollback
+      _ <- put ctx
+      if isSubtypeOf (_classEnv ctx) etyS ty'
+        then pure $ TypedExpr bty (TLetInit (iden, TypeVar ty, e) body')
+        else lift $ Left $ IsNotSubtypeOf etyS ty'
 
 typecheckFeature :: Context -> Feature -> Either TypedExpr a
 typecheckFeature = undefined
