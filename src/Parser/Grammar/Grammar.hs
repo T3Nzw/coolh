@@ -96,8 +96,10 @@ method = do
 -- TODO:
 field :: P.Parser String Lexemes Feature
 field = do
-  Binding obj ty expr <- binding
-  Field obj ty expr . extractPos <$> P.peek
+  Binding obj ty expr pos <- binding
+  pure $ case expr of
+    Nothing -> AttrNoInit obj ty pos
+    Just expr' -> AttrInit obj ty expr' pos
 
 feature :: P.Parser String Lexemes Feature
 feature = method <|> field
@@ -118,9 +120,9 @@ binding :: P.Parser String Lexemes Binding
 binding = do
   Arg iden tyIden pos <- formal
   expr <- P.zeroOrOne $ lsat L.ASSIGN >> ast
-  -- assume the same position as the binding if no value for the expression is provided
-  let expr' = case expr of Nothing -> noexpr pos; Just expr'' -> expr''
-  pure $ Binding iden tyIden expr'
+  pure $ case expr of
+    Nothing -> Binding iden tyIden expr pos
+    Just expr' -> Binding iden tyIden expr (astpos expr')
 
 -- pattern matches
 

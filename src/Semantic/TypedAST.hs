@@ -110,4 +110,23 @@ getType (TypedExpr ty _) = ty
 eqType :: TypedExpr -> TypedExpr -> Bool
 eqType (TypedExpr ty1 _) (TypedExpr ty2 _) = ty1 == ty2
 
-data TypedFeature ty
+data TypedFeat
+  = TAttrNoInit ByteString Type
+  | TAttrInit ByteString Type TypedExpr
+  | TMethod ByteString [(ByteString, Type)] Type TypedExpr
+  deriving (Show)
+
+data TypedFeature where
+  TypedFeature :: Type -> TypedFeat -> TypedFeature
+
+deriving instance Show TypedFeature
+
+data TypedClass where
+  TypedClass :: Type -> [TypedFeature] -> TypedClass
+
+deriving instance Show TypedClass
+
+data TypedProgram where
+  TypedProgram :: [TypedClass] -> TypedProgram
+
+deriving instance Show TypedProgram

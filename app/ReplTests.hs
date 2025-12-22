@@ -15,8 +15,13 @@ createAST s = case runParser ast $ initial $ lexer s of
   Left err -> error err
   Right (tree, _) -> tree
 
-typeofAST :: AST -> Either TypeError TypedExpr
-typeofAST = typecheckAST (emptyCtx $ TypeVar "Foo")
+createFeature :: ByteString -> Feature
+createFeature s = case runParser feature $ initial $ lexer s of
+  Left err -> error err
+  Right (feat, _) -> feat
 
-typeof :: ByteString -> Either TypeError TypedExpr
-typeof = typeofAST . createAST
+typeAST :: ByteString -> Either TypeError TypedExpr
+typeAST = typeof (emptyCtx $ TypeVar "Foo") . createAST
+
+typeFeature :: ByteString -> Either TypeError TypedFeature
+typeFeature = typeof (emptyCtx $ TypeVar "Foo") . createFeature

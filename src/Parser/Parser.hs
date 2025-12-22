@@ -14,7 +14,6 @@ module Parser.Parser
     notype,
     treefmt,
     astfmt, -- TODO: remove
-    noexpr,
     astpos,
     selfObj,
   )
@@ -64,7 +63,8 @@ mkClass (Just inherited) (ClassInherits iden _ feats fp sp) =
 
 data Feature
   = Method Objectid [Formal] Typeid AST SourcePos
-  | Field Objectid Typeid AST SourcePos
+  | AttrInit Objectid Typeid AST SourcePos
+  | AttrNoInit Objectid Typeid SourcePos
   deriving (Show, Eq, Ord)
 
 -- useful for the ast.
@@ -74,7 +74,7 @@ data Formal = Arg Objectid Typeid SourcePos
 
 -- NOTE: might need source pos?
 
-data Binding = Binding Objectid Typeid AST
+data Binding = Binding Objectid Typeid (Maybe AST) SourcePos
   deriving (Show, Eq, Ord)
 
 data PatternMatch = PMatch Objectid Typeid AST SourcePos
@@ -115,7 +115,6 @@ data AST
   | Number Typeid Objectid SourcePos -- ok
   | Str Typeid Objectid SourcePos -- ok
   | Boolean Typeid Objectid SourcePos -- ok
-  | NoExpr Typeid SourcePos
   deriving (Show, Eq, Ord)
 
 -- TODO: use generics
@@ -146,10 +145,6 @@ astpos = \case
   Number _ _ p -> p
   Str _ _ p -> p
   Boolean _ _ p -> p
-  NoExpr _ p -> p
-
-noexpr :: SourcePos -> AST
-noexpr = NoExpr NoType
 
 selfObj :: SourcePos -> AST
 selfObj = Id notype (Objectid "self")
@@ -436,13 +431,6 @@ astfmt indent (Boolean ty iden pos) =
         ++ indent
         ++ ":"
         ++ typefmt " " ty
-astfmt indent (NoExpr ty pos) =
-  posfmt indent pos
-    ++ astnode indent "_no_expr"
-    ++ newline
-    ++ indent
-    ++ ":"
-    ++ typefmt " " ty
 
 type Indent = String
 
@@ -487,15 +475,6 @@ formalfmt indent (Arg iden ty pos) =
         ++ newline
         ++ typefmt indent' ty
 
-bindfmt :: Indent -> Binding -> String
-bindfmt indent (Binding iden ty ast) =
-  objectfmt indent iden
-    ++ newline
-    ++ typefmt indent ty
-    ++ newline
-    -- TODO: indentation?
-    ++ astfmt indent ast
-
 pmatchfmt :: Indent -> PatternMatch -> String
 pmatchfmt indent (PMatch iden ty ast pos) =
   let indent' = idInc indent
@@ -509,7 +488,7 @@ pmatchfmt indent (PMatch iden ty ast pos) =
         ++ astfmt indent' ast
 
 featurefmt :: Indent -> Feature -> String
-featurefmt indent (Field iden ty val pos) =
+featurefmt indent (AttrInit iden ty val pos) =
   let indent' = idInc indent
    in posfmt indent pos
         ++ astnode indent "_attr"
@@ -519,6 +498,16 @@ featurefmt indent (Field iden ty val pos) =
         ++ typefmt indent' ty
         ++ newline
         ++ astfmt indent' val
+featurefmt indent (AttrNoInit iden ty pos) =
+  let indent' = idInc indent
+   in posfmt indent pos
+        ++ astnode indent "_attr"
+        ++ newline
+        ++ objectfmt indent' iden
+        ++ newline
+        ++ typefmt indent' ty
+        ++ newline
+        ++ "no_expr : no_type"
 featurefmt indent (Method iden args ty val pos) =
   let indent' = idInc indent
    in posfmt indent pos

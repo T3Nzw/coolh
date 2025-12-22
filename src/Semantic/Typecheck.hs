@@ -8,16 +8,13 @@ import Data.List (intersect)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Maybe (fromJust)
-import Data.Type.Equality ((:~:) (..))
-import Debug.Trace (trace)
 import Parser.Parser
 import Semantic.Error
 import Semantic.TypedAST
 
--- talk about a suboptimal representation
-type ObjectEnv = M.Map Objectid Type -- ?
+type ObjectEnv = M.Map Objectid Type
 
-type MethodEnv = M.Map Feature Type -- ?
+type MethodEnv = M.Map Feature Type
 
 type ClassEnv = M.Map Type (Maybe Type)
 
@@ -33,6 +30,9 @@ data Context
   deriving (Show)
 
 makeLenses ''Context
+
+third :: (a, b, c) -> c
+third (_, _, x) = x
 
 builinClasses :: ClassEnv
 builinClasses =
@@ -182,14 +182,62 @@ typecheckAST ctx' expr = evalStateT (typecheckAST' expr) ctx'
       if isSubtypeOf (_classEnv ctx) (getType expr') ty'
         then pure $ TypedExpr (getType body') $ TLetInit (iden, ty', expr') body'
         else undefined
+    typecheckAST' (CaseOf _ ast pms _) = do
+      expr <- typecheckAST' ast
+      let pms' = Prelude.map (\(PMatch iden (Typeid ty) expr _) -> (iden, toType ty, expr)) $ NE.toList pms
+      ctx <- get
+      mapM_ (\(iden, ty, _) -> modify (over objectEnv (M.insert iden ty))) pms'
+      exprs <- mapM (typecheckAST' . third) pms'
+      let exprs' = Prelude.zipWith (\(Objectid iden, ty, _) expr -> (iden, ty, expr)) pms' exprs
+      let elub = lub (_classEnv ctx) $ Prelude.map getType exprs
+      _ <- put ctx
+      pure $ TypedExpr elub $ TCaseOf expr $ NE.fromList exprs'
 
-typecheckFeature :: Context -> Feature -> Either TypedExpr a
-typecheckFeature = undefined
+typecheckFeature :: Context -> Feature -> Either TypeError TypedFeature
+typecheckFeature ctx' feat = evalStateT (typecheckFeature' feat) ctx'
+  where
+    typecheckFeature' :: Feature -> StateT Context (Either TypeError) TypedFeature
+    typecheckFeature' (AttrNoInit obj@(Objectid iden) (Typeid tyid) _) = do
+      let ty = toType tyid
+      -- TODO: idk?
+      modify (over objectEnv (M.insert obj ty))
+      pure $ TypedFeature ty (TAttrNoInit iden ty)
+    typecheckFeature' (AttrInit obj@(Objectid iden) (Typeid tyid) expr _) = do
+      let ty = toType tyid
+      -- maybe not...
+      modify (over objectEnv (M.insert obj ty))
+      ctx <- get
+      modify (over objectEnv (M.insert (Objectid "self") SelfType))
+      ctx' <- get
+      let expr' = typecheckAST ctx' expr
+      _ <- put ctx
+      case expr' of
+        Left err -> lift $ Left err
+        Right e@(TypedExpr ety _) ->
+          if isSubtypeOf (_classEnv ctx') ety ty
+            then pure $ TypedFeature ty $ TAttrInit iden ty e
+            else lift $ Left $ IsNotSubtypeOf e (TypedExpr ty $ TId iden)
+    typecheckFeature' (Method obj@(Objectid iden) args (Typeid tyid) body _) = undefined
 
--- TODO: caseof, static dispatch, dynamic dispatch, attributes, methods
+-- TODO: static dispatch, dynamic dispatch, attributes, methods
+
+typecheckClass :: Context -> Class -> Either TypeError TypedClass
+typecheckClass = undefined
+
+typecheckProgram :: Context -> Program -> Either TypeError TypedProgram
+typecheckProgram = undefined
 
 class Typeable a atyped | a -> atyped where
   typeof :: Context -> a -> Either TypeError atyped
 
 instance Typeable AST TypedExpr where
   typeof = typecheckAST
+
+instance Typeable Feature TypedFeature where
+  typeof = typecheckFeature
+
+instance Typeable Class TypedClass where
+  typeof = undefined
+
+instance Typeable Program TypedProgram where
+  typeof = undefined
