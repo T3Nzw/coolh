@@ -28,3 +28,4 @@ resources.txt
 github-repo.txt
 out/
 parser_tests/
+semantics_tests/
