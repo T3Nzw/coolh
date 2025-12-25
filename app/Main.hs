@@ -1,8 +1,9 @@
 module Main where
 
+import System.Environment (getArgs)
+
 import File.LexerFmt
 import File.ParserFmt
-import System.Environment (getArgs)
 
 main :: IO ()
 main = do

@@ -1,26 +1,27 @@
 module Data.BSUtil
-  ( isAsciiUpper8,
-    isAsciiLower8,
-    isDigit8,
-    char8,
-    word8,
-    string8,
-    bytestring8,
-    bytesToString,
-    toLower8,
-    controlToHex,
-    surround8,
-    surround,
+  ( isAsciiUpper8
+  , isAsciiLower8
+  , isDigit8
+  , char8
+  , word8
+  , string8
+  , bytestring8
+  , bytesToString
+  , toLower8
+  , controlToHex
+  , surround8
+  , surround
   )
 where
 
-import qualified Data.ByteString as B
 import Data.Char (chr, isAsciiLower, isAsciiUpper, isDigit, toLower)
 import Data.Functor.Contravariant (Contravariant (contramap), Op (..))
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
 import Data.Word (Word8)
 import Numeric (showHex)
+
+import qualified Data.ByteString as B
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 
 -- ByteString utilities inspired by Data.Char :)
 
@@ -61,9 +62,9 @@ controlToHex c
   | c == char8 '\n' = "\n"
   | c >= 32 && c < 127 = pure . word8 $ c
   | otherwise = "<0x" ++ pad (showHex c "") ++ ">"
-  where
-    pad [x] = ['0', x]
-    pad xs = xs
+ where
+  pad [x] = ['0', x]
+  pad xs = xs
 
 surround8 :: B.ByteString -> B.ByteString -> B.ByteString
 surround8 x s = B.append x . B.append s $ x

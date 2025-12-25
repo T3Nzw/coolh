@@ -1,10 +1,11 @@
 module Debug.Flags where
 
 import Data.ByteString (ByteString)
+
 import Parser.Core (Parser, string)
 
 data FlagError = UnrecognisedFlag
-  deriving (Eq)
+  deriving Eq
 
 instance Semigroup FlagError where
   lhs <> _ = lhs
@@ -16,7 +17,7 @@ instance Monoid FlagError where
 data DebugFlag
   = LEXDUMP
   | PARDUMP
-  deriving (Eq)
+  deriving Eq
 
 parseLexDump :: Parser FlagError ByteString DebugFlag
 parseLexDump = string "--lexer" >> pure LEXDUMP

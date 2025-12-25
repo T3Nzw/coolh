@@ -1,6 +1,7 @@
 module Data.Sizeable where
 
 import Data.ByteString (ByteString, length)
+
 import Lexer.Lexer (Lexeme (..))
 
 class Sizeable a where

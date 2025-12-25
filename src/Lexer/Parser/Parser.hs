@@ -2,14 +2,22 @@ module Lexer.Parser.Parser where
 
 import Control.Applicative
 import Control.Monad (void)
-import Data.BSUtil (char8, controlToHex, isAsciiLower8, toLower8, word8)
 import Data.ByteString (ByteString, length, pack, singleton, unpack)
-import Data.Stream
-import qualified Lexer.Error as LE
-import Lexer.Lexer (Lexeme (..), LexemeTag (..), mkLexComment, mkLexError, mkLexStr)
-import Lexer.Parser.Combinators
-import qualified Parser.Core as P
 import Prelude hiding (div)
+
+import Data.BSUtil (char8, controlToHex, isAsciiLower8, toLower8, word8)
+import Data.Stream
+import Lexer.Lexer
+  ( Lexeme (..)
+  , LexemeTag (..)
+  , mkLexComment
+  , mkLexError
+  , mkLexStr
+  )
+import Lexer.Parser.Combinators
+
+import qualified Lexer.Error as LE
+import qualified Parser.Core as P
 
 -- Parser combinators for tokens.
 
@@ -57,16 +65,18 @@ str = do
   pure $ case s of
     Left _ -> mkLexError LE.UnterminatedStringAtEOF
     Right s' -> case s' of
-      Lexeme STR_CONST (Just val) | Data.ByteString.length val > 1024 -> mkLexError (LE.StringConstantTooLong $ Data.ByteString.length val)
+      Lexeme STR_CONST (Just val)
+        | Data.ByteString.length val > 1024 ->
+            mkLexError (LE.StringConstantTooLong $ Data.ByteString.length val)
       _ -> s'
-  where
-    untilP =
-      P.untilPlus
-        strc
-        ( (P.char (char8 '"') >> pure (mkLexStr ""))
-            <|> (P.char (char8 '\n') >> pure (mkLexError LE.StringContainsUnescapedNewLine))
-            <|> (eof >> pure (mkLexError LE.UnterminatedStringAtEOF))
-        )
+ where
+  untilP =
+    P.untilPlus
+      strc
+      ( (P.char (char8 '"') >> pure (mkLexStr ""))
+          <|> (P.char (char8 '\n') >> pure (mkLexError LE.StringContainsUnescapedNewLine))
+          <|> (eof >> pure (mkLexError LE.UnterminatedStringAtEOF))
+      )
 
 olcomment :: LParser
 olcomment = do
@@ -93,26 +103,32 @@ comments = comment <|> commentBegin <|> commentEnd <|> olcomment
 -- whoever decided that this is ok should be in jail
 bool :: LParser
 bool = Lexeme BOOL_CONST . Just . pack . map toLower8 . unpack <$> (t <|> f)
-  where
-    t = liftA2 cons (P.char $ char8 't') (stringCI "rue")
-    f = liftA2 cons (P.char $ char8 'f') (stringCI "alse")
+ where
+  t = liftA2 cons (P.char $ char8 't') (stringCI "rue")
+  f = liftA2 cons (P.char $ char8 'f') (stringCI "alse")
 
 int :: LParser
 int = Lexeme INT_CONST . Just . pack <$> P.many1 digit
 
 objectid :: LParser
-objectid = Lexeme OBJECTID . Just <$> liftA2 cons lower (fmap pack $ many $ alphanum <|> underscore)
+objectid =
+  Lexeme OBJECTID . Just
+    <$> liftA2 cons lower (fmap pack $ many $ alphanum <|> underscore)
 
 typeid :: LParser
-typeid = Lexeme TYPEID . Just <$> liftA2 cons upper (fmap pack $ many $ alphanum <|> underscore)
+typeid =
+  Lexeme TYPEID . Just
+    <$> liftA2 cons upper (fmap pack $ many $ alphanum <|> underscore)
 
 discard :: LexemeTag -> Char -> LParser
 discard tag c = Lexeme tag . const Nothing . singleton <$> P.oneOf ulcases
-  where
-    ulcases = [char8 c, toLower8 (char8 c)]
+ where
+  ulcases = [char8 c, toLower8 (char8 c)]
 
 discardS :: LexemeTag -> String -> LParser
-discardS tag s = Lexeme tag . const Nothing . pack . map toLower8 . unpack <$> stringCI (pack $ map char8 s)
+discardS tag s =
+  Lexeme tag . const Nothing . pack . map toLower8 . unpack
+    <$> stringCI (pack $ map char8 s)
 
 semicolon :: LParser
 semicolon = discard SEMICOLON ';'
@@ -237,47 +253,47 @@ lexerP = do
   comments
     <|> foldr1
       (P.<+>)
-      [ str,
-        semicolon,
-        colon,
-        darrow,
-        lbrace,
-        rbrace,
-        lparen,
-        rparen,
-        at,
-        comma,
-        dot,
-        add,
-        sub,
-        mul,
-        div,
-        tilda,
-        eq,
-        le,
-        lt,
-        assign,
-        if',
-        then',
-        else',
-        fi,
-        case',
-        esac,
-        loop,
-        pool,
-        while,
-        class',
-        in',
-        inherits,
-        isvoid,
-        let',
-        new,
-        of',
-        not',
-        bool,
-        int,
-        objectid,
-        typeid
+      [ str
+      , semicolon
+      , colon
+      , darrow
+      , lbrace
+      , rbrace
+      , lparen
+      , rparen
+      , at
+      , comma
+      , dot
+      , add
+      , sub
+      , mul
+      , div
+      , tilda
+      , eq
+      , le
+      , lt
+      , assign
+      , if'
+      , then'
+      , else'
+      , fi
+      , case'
+      , esac
+      , loop
+      , pool
+      , while
+      , class'
+      , in'
+      , inherits
+      , isvoid
+      , let'
+      , new
+      , of'
+      , not'
+      , bool
+      , int
+      , objectid
+      , typeid
       ]
     <|> case h of
       Just h' -> P.item (const (mkLexError $ LE.InvalidSymbol $ controlToHex h'))

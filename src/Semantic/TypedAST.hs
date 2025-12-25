@@ -1,9 +1,11 @@
 module Semantic.TypedAST where
 
-import Data.BSUtil (bytesToString, string8)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import Data.List.NonEmpty (NonEmpty, toList)
+
+import qualified Data.ByteString as B
+
+import Data.BSUtil (bytesToString)
 
 data Type where
   ObjectType :: Type
@@ -114,7 +116,7 @@ data TypedFeat
   = TAttrNoInit ByteString Type
   | TAttrInit ByteString Type TypedExpr
   | TMethod ByteString [(ByteString, Type)] Type TypedExpr
-  deriving (Show)
+  deriving Show
 
 data TypedFeature where
   TypedFeature :: Type -> TypedFeat -> TypedFeature

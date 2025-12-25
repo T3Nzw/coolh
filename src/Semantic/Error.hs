@@ -1,6 +1,7 @@
 module Semantic.Error where
 
 import Data.ByteString (ByteString)
+
 import Semantic.TypedAST
 
 data TypeError
@@ -10,4 +11,4 @@ data TypeError
   | ExpectedTypeInExprButGot Type TypedExpr
   | IsNotSubtypeOf TypedExpr TypedExpr
   | UndeclaredIdentifier ByteString
-  deriving (Show)
+  deriving Show

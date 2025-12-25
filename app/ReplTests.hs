@@ -1,6 +1,7 @@
 module ReplTests where
 
 import Data.ByteString (ByteString)
+
 import Lexer.Util
 import Parser.Core
 import Parser.Grammar.Grammar

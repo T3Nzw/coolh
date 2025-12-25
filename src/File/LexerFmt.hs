@@ -1,8 +1,10 @@
 module File.LexerFmt where
 
-import qualified Data.ByteString as B
 import GHC.IO.Handle.FD (openBinaryFile)
 import GHC.IO.IOMode (IOMode (ReadMode))
+
+import qualified Data.ByteString as B
+
 import Lexer.Util
 
 writeLexemes :: FilePath -> B.ByteString -> IO ()

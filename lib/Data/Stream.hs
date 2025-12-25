@@ -1,8 +1,10 @@
 module Data.Stream where
 
-import Data.BSUtil (char8)
-import qualified Data.ByteString as BS
 import Data.Word (Word8)
+
+import qualified Data.ByteString as BS
+
+import Data.BSUtil (char8)
 import Parser.Position (SourcePos (..), State (..))
 
 -- A stream-like type class.

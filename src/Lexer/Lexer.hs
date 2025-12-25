@@ -1,7 +1,8 @@
 module Lexer.Lexer where
 
-import Data.BSUtil (bytesToString)
 import Data.ByteString (ByteString)
+
+import Data.BSUtil (bytesToString)
 import Lexer.Error
 import Parser.Position
 
@@ -71,6 +72,6 @@ mkLexStr :: ByteString -> Lexeme
 mkLexStr s = Lexeme STR_CONST (Just s)
 
 data LexInfo = LexInfo Lexeme SourcePos
-  deriving (Show)
+  deriving Show
 
 type Lexemes = [LexInfo]

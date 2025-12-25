@@ -6,19 +6,22 @@ module Parser.Grammar.Grammar where
 -- TODO: encode precedence of all operators
 
 import Control.Applicative (empty, (<|>))
-import qualified Data.ByteString as B
 import Data.List.NonEmpty
-import qualified Data.Map as M
 import Data.Maybe (fromJust)
+import Prelude hiding (div, not)
+
+import qualified Data.ByteString as B
+import qualified Data.Map as M
+
 import Lexer.Lexer (LexInfo (..), Lexeme (..), LexemeTag, Lexemes)
-import qualified Lexer.Lexer as L
 import Parser.Core (Parser (runParser))
-import qualified Parser.Core as P
 import Parser.Grammar.Pratt
 import Parser.Parser
 import Parser.Position (SourcePos, initial)
+
+import qualified Lexer.Lexer as L
+import qualified Parser.Core as P
 import qualified Parser.Position as Pos
-import Prelude hiding (div, not)
 
 -- combinators
 
@@ -32,7 +35,8 @@ tagcmp tag (LexInfo (Lexeme tag' _) _) = tag == tag'
 lsat :: LexemeTag -> P.Parser String Lexemes LexInfo
 lsat tag = P.sat $ tagcmp tag
 
-named :: LexemeTag -> (B.ByteString -> Pos.SourcePos -> a) -> P.Parser String Lexemes a
+named
+  :: LexemeTag -> (B.ByteString -> Pos.SourcePos -> a) -> P.Parser String Lexemes a
 named tag ctor = do
   LexInfo (Lexeme _ value) pos <- lsat tag
   pure $ ctor (fromJust value) pos
@@ -249,11 +253,11 @@ letin = do
   _ <- lsat L.IN
   body <- ast
   pure $ foldr buildAST body binds
-  where
-    buildAST (iden, ty, Just expr, sp) xs =
-      LetInit notype (iden, ty, expr) xs sp
-    buildAST (iden, ty, Nothing, sp) xs =
-      LetNoInit notype (iden, ty) xs sp
+ where
+  buildAST (iden, ty, Just expr, sp) xs =
+    LetInit notype (iden, ty, expr) xs sp
+  buildAST (iden, ty, Nothing, sp) xs =
+    LetNoInit notype (iden, ty) xs sp
 
 caseof :: P.Parser String Lexemes AST
 caseof = do
@@ -305,7 +309,10 @@ neg = do
 --    30 31     40 41       30 31
 
 operation :: P.Parser String Lexemes LexemeTag
-operation = fmap (\(LexInfo (Lexeme tag _) _) -> tag) $ foldr1 (<|>) $ Prelude.map lsat [L.ADD, L.SUB, L.MUL, L.DIV, L.LT, L.LE, L.EQ]
+operation =
+  fmap (\(LexInfo (Lexeme tag _) _) -> tag)
+    $ foldr1 (<|>)
+    $ Prelude.map lsat [L.ADD, L.SUB, L.MUL, L.DIV, L.LT, L.LE, L.EQ]
 
 -- i struggled to write this for about 3 hrs at uni bc i had no paper.
 -- wrote out the algorithm on paper and it finally works :)
@@ -339,22 +346,22 @@ ast' :: P.Parser String Lexemes AST
 ast' =
   foldr1
     (<|>)
-    [ int,
-      bool,
-      str,
-      parenthesised,
-      dispatch,
-      not,
-      tilda,
-      assign,
-      ifthenelse,
-      whileloop,
-      statement,
-      letin,
-      new,
-      isvoid,
-      caseof,
-      Parser.Grammar.Grammar.id
+    [ int
+    , bool
+    , str
+    , parenthesised
+    , dispatch
+    , not
+    , tilda
+    , assign
+    , ifthenelse
+    , whileloop
+    , statement
+    , letin
+    , new
+    , isvoid
+    , caseof
+    , Parser.Grammar.Grammar.id
     ]
 
 -- TODO: make a parser for eliminating left recursion.

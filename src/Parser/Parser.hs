@@ -1,21 +1,21 @@
 module Parser.Parser
-  ( MProgram (..),
-    Typeid (..),
-    Objectid (..),
-    Program (..),
-    Class (..),
-    Feature (..),
-    Formal (..),
-    Binding (..),
-    PatternMatch (..),
-    AST (..),
-    defaultClass,
-    mkClass,
-    notype,
-    treefmt,
-    astfmt, -- TODO: remove
-    astpos,
-    selfObj,
+  ( MProgram (..)
+  , Typeid (..)
+  , Objectid (..)
+  , Program (..)
+  , Class (..)
+  , Feature (..)
+  , Formal (..)
+  , Binding (..)
+  , PatternMatch (..)
+  , AST (..)
+  , defaultClass
+  , mkClass
+  , notype
+  , treefmt
+  , astfmt -- TODO: remove
+  , astpos
+  , selfObj
   )
 where
 
@@ -25,16 +25,17 @@ where
 -- patterns, and especially LISTS. boilerplate could be reduced via a more generic serialisation type class.
 -- in a rush rn, so will implement later
 
-import Data.BSUtil (bytesToString)
 import Data.ByteString (ByteString)
 import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty (..), toList)
+
+import Data.BSUtil (bytesToString)
 import Parser.Position
 
 data MProgram
   = MProgram
-  { _entryPoint :: Program,
-    _filename :: FilePath
+  { _entryPoint :: Program
+  , _filename :: FilePath
   }
 
 data Typeid = Typeid ByteString | NoType
@@ -47,10 +48,10 @@ newtype Objectid = Objectid ByteString
   deriving (Show, Eq, Ord)
 
 data Program = Program (NonEmpty Class) SourcePos
-  deriving (Show)
+  deriving Show
 
 data Class = ClassInherits Typeid Typeid [Feature] FilePath SourcePos
-  deriving (Show)
+  deriving Show
 
 defaultClass :: Typeid -> [Feature] -> FilePath -> SourcePos -> Class
 defaultClass iden feats fp sp =

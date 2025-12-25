@@ -2,13 +2,16 @@ module Lexer.Util where
 
 import Control.Lens ((%~), (&), (^.))
 import Control.Monad.State
-import Data.BSUtil (bytesToString, surround)
+
 import qualified Data.ByteString as B
+
+import Data.BSUtil (bytesToString, surround)
 import Lexer.Error
 import Lexer.Lexer
 import Lexer.Parser.Parser
 import Parser.Core
 import Parser.Position (lineNumber)
+
 import qualified Parser.Position as Pos
 
 type LexState = State Lexemes (Maybe (Pos.State B.ByteString))
@@ -39,7 +42,10 @@ lexfmt lexemes =
     ( \(LexInfo lexeme pos) ->
         "#" ++ show (pos ^. lineNumber) ++ " " ++ lexafmt lexeme ++ "\n"
     )
-    (Prelude.filter (\(LexInfo (Lexeme tag _) _) -> tag /= EOF && tag /= COMMENT) lexemes)
+    ( Prelude.filter
+        (\(LexInfo (Lexeme tag _) _) -> tag /= EOF && tag /= COMMENT)
+        lexemes
+    )
 
 lexafmt :: Lexeme -> String
 lexafmt (Lexeme tag@STR_CONST (Just value)) = lextagfmt tag ++ " " ++ show (bytesToString value)
