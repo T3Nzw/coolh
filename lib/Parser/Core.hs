@@ -221,7 +221,7 @@ inspect p = MkParser $ \inp -> do
     Left err -> Left err
     Right (val, st) ->
       let abso2 = st ^. Pos.pos . Pos.absOffset
-       in Right ((val, Data.Stream.take (abso2 - abso1 + 1) $ inp ^. Pos.input), st)
+       in Right ((val, Data.Stream.take (abso2 - abso1) $ inp ^. Pos.input), st)
 
 -- precedence parsing combinator, inspired by pratt parsing
 chain1Rhs :: (Monoid e, Ord repr, Stream s) => (s -> repr) -> M.Map repr (Int, Int) -> (Int, Int) -> a -> Parser e s a -> Parser e s (a -> a -> a) -> Parser e s a

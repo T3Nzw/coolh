@@ -93,8 +93,6 @@ instance Show TypedAST where
   show (TStaticDispatch) = error "not yet implemented"
   show (TDynamidDispatch) = error "not yet implemented"
 
--- TODO: let, new, static and dynamic dispatch, noexpr, caseof
-
 data TypedExpr where
   TypedExpr :: Type -> TypedAST -> TypedExpr
 

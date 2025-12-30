@@ -28,7 +28,8 @@ instance Stream [a] where
   cons = (:)
   uncons [] = Nothing
   uncons (h : t) = Just (h, t)
-  computeOffset = const
+  computeOffset (State inp (SourcePos abso ln col tw)) _ =
+    State inp (SourcePos (abso + 1) ln col tw)
 
 instance Stream [Char] where
   type Element [Char] = Char
