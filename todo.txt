@@ -9,30 +9,40 @@ TODO:
 [] better names for modules (+ better separation of code)
 
 *****************************************************
+                     CODEGEN
+*****************************************************
+
+[] monadic combinators for code generation
+
+*****************************************************
                  SEMANTIC ANALYSER
 *****************************************************
 
+[] somehow handle inherited features, their type and scope
+
+[] better errors that describe the type of the expression?
+
 [x] typechecking for Parenthesised
 
-[] fix typechecking for equal (needs to support all atomic types)
+[x] fix typechecking for equal (needs to support all atomic types)
 
 [] typechecking for static and dynamic dispatch
 
-[] typechecking for NoExpr (this might be a let/attr thing?)
+[x] typechecking for NoExpr (this might be a let/attr thing?)
 
-[] typechecking for CaseOf
+[x] typechecking for CaseOf
 
-[] typechecking for Let (might need to modify the tree)
+[x] typechecking for Let (might need to modify the tree)
 
 [] typechecking for methods
 
 [] typechecking for attributes
 
-[] typechecking for classes (occurs-check)
+[x] typechecking for classes (occurs-check)
 
 [] SELF_TYPE stuff
 
-[] proper conversion of inferred types to their respective
+[x] proper conversion of inferred types to their respective
    ADT representation. for example, lub [<some_types>]
    returns a ByteString, which is not ideal since
    the lub might happen to be Int, which is represented
@@ -44,9 +54,11 @@ TODO:
                       PARSER
 *****************************************************
 
-[] operator precedence
+[] fix associativity of non-associative operators
 
-[] nested lets
+[x] operator precedence
+
+[x] nested lets
 
 [] error handling
 

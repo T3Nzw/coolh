@@ -75,3 +75,6 @@ data LexInfo = LexInfo Lexeme SourcePos
   deriving Show
 
 type Lexemes = [LexInfo]
+
+extractTag :: LexInfo -> LexemeTag
+extractTag (LexInfo (Lexeme tag _) _) = tag

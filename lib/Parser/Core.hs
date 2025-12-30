@@ -19,6 +19,9 @@ module Parser.Core
   , Parser.Core.traverse
   , tryCatch
   , eof
+  , inspect
+  , chain1
+  , choice
   , (<+>)
   )
 where
@@ -27,9 +30,10 @@ import Control.Lens ((&), (.~), (^.))
 import Control.Monad (MonadPlus)
 
 import qualified Control.Applicative as App
+import qualified Data.Map as M
 
 import Data.Sizeable (Sizeable (..))
-import Data.Stream (Stream (..))
+import Data.Stream (Stream (..), take)
 
 import qualified Parser.Position as Pos
 
@@ -119,6 +123,9 @@ many1 p = do
   xs <- many p
   pure $ x : xs
 
+choice :: (Monoid e, Stream s) => [Parser e s a] -> Parser e s a
+choice = App.asum
+
 -- | Consume if the head of a non-empty stream is an element of the range
 oneOf
   :: (Eq (Element s), Monoid e, Stream s) => [Element s] -> Parser e s (Element s)
@@ -164,11 +171,11 @@ peek = MkParser $ \inp ->
     Nothing -> Left mempty
     Just (h, _) -> Right (h, inp)
 
-lookahead :: (Monoid e, Stream s) => Parser e s a -> Parser e s a
+lookahead :: (Monoid e, Stream s) => Parser e s a -> Parser e s (Maybe a)
 lookahead (MkParser p) = MkParser $ \inp ->
   case p inp of
-    Left err -> Left err
-    Right (res, _) -> Right (res, inp)
+    Left _ -> Right (Nothing, inp)
+    Right (res, _) -> Right (Just res, inp)
 
 -- | Consume all characters uing the first parser until the second
 -- parser succeeds
@@ -205,3 +212,35 @@ eof eofErr = MkParser $ \inp ->
   case uncons (inp ^. Pos.input) of
     Nothing -> Right ((), inp)
     Just _ -> Left eofErr
+
+-- | Inspect what was read by a parser that succeeded
+inspect :: (Monoid e, Stream s) => Parser e s a -> Parser e s (a, s)
+inspect p = MkParser $ \inp -> do
+  let abso1 = inp ^. Pos.pos . Pos.absOffset
+  case runParser p inp of
+    Left err -> Left err
+    Right (val, st) ->
+      let abso2 = st ^. Pos.pos . Pos.absOffset
+       in Right ((val, Data.Stream.take (abso2 - abso1 + 1) $ inp ^. Pos.input), st)
+
+-- precedence parsing combinator, inspired by pratt parsing
+chain1Rhs :: (Monoid e, Ord repr, Stream s) => (s -> repr) -> M.Map repr (Int, Int) -> (Int, Int) -> a -> Parser e s a -> Parser e s (a -> a -> a) -> Parser e s a
+chain1Rhs convert table (prevLbp, prevRbp) lhs atomp opp = do
+  operation <- lookahead $ inspect opp
+  case operation of
+    Nothing -> pure lhs
+    Just (op, sOp) ->
+      case M.lookup (convert sOp) table of
+        Nothing -> App.empty
+        Just (lbp, rbp)
+          -- TODO: handle non-associative operators
+          | prevRbp < lbp -> do
+              _ <- opp
+              rhs <- chain1 convert table (lbp, rbp) atomp opp
+              chain1Rhs convert table (prevLbp, prevRbp) (lhs `op` rhs) atomp opp
+          | otherwise -> pure lhs
+
+chain1 :: (Monoid e, Ord repr, Stream s) => (s -> repr) -> M.Map repr (Int, Int) -> (Int, Int) -> Parser e s a -> Parser e s (a -> a -> a) -> Parser e s a
+chain1 convert table bp atompp opp = do
+  lhs <- atompp
+  chain1Rhs convert table bp lhs atompp opp

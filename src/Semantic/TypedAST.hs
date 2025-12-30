@@ -51,12 +51,15 @@ data TypedAST
   | TCaseOf TypedExpr (NonEmpty (B.ByteString, Type, TypedExpr))
   | TLetNoInit (B.ByteString, Type) TypedExpr
   | TLetInit (B.ByteString, Type, TypedExpr) TypedExpr
+  | TStaticDispatch
+  | TDynamidDispatch
 
 instance Show TypedAST where
   show (TNumber n) = show n
   show (TBoolean b) = show b
   show (TStr s) = show s
   show (TId x) = bytesToString x
+  show (TAssign x expr) = bytesToString x ++ " <- " ++ show expr
   show (TAdd a b) = "(" ++ show a ++ " + " ++ show b ++ ")"
   show (TSub a b) = "(" ++ show a ++ " - " ++ show b ++ ")"
   show (TMul a b) = "(" ++ show a ++ " * " ++ show b ++ ")"
@@ -87,6 +90,8 @@ instance Show TypedAST where
       ++ show expr
       ++ " in "
       ++ show body
+  show (TStaticDispatch) = error "not yet implemented"
+  show (TDynamidDispatch) = error "not yet implemented"
 
 -- TODO: let, new, static and dynamic dispatch, noexpr, caseof
 

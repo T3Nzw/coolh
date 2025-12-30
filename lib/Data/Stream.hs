@@ -1,6 +1,7 @@
 module Data.Stream where
 
 import Data.Word (Word8)
+import Prelude hiding (take)
 
 import qualified Data.ByteString as BS
 
@@ -18,6 +19,8 @@ class Stream s where
 
   -- this completely breaks my abstraction but otherwise types are ambiguous...
   computeOffset :: State s -> Element s -> State s
+
+-- i finally understand why undecidable instances aren't on by default lol
 
 instance Stream [a] where
   type Element [a] = a
@@ -48,3 +51,10 @@ instance Stream BS.ByteString where
     | c == char8 '\n' = State inp $ SourcePos (abso + 1) (ln + 1) 0 tw
     | c == char8 '\t' = State inp $ SourcePos (abso + tw) ln (col + tw) tw
     | otherwise = State inp $ SourcePos (abso + 1) ln (col + 1) tw
+
+take :: Stream s => Int -> s -> s
+take n s
+  | n <= 0 = empty
+  | otherwise = case uncons s of
+      Nothing -> empty
+      Just (h, t) -> cons h $ take (n - 1) t

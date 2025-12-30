@@ -38,11 +38,11 @@ data MProgram
   , _filename :: FilePath
   }
 
-data Typeid = Typeid ByteString | NoType
+data Typeid = Typeid ByteString
   deriving (Show, Eq, Ord)
 
 notype :: Typeid
-notype = NoType
+notype = Typeid "no_type"
 
 newtype Objectid = Objectid ByteString
   deriving (Show, Eq, Ord)
@@ -458,7 +458,6 @@ posfmt :: Indent -> SourcePos -> String
 posfmt indent pos = indent ++ "#" ++ show (_lineNumber pos)
 
 typefmt :: Indent -> Typeid -> String
-typefmt indent NoType = indent ++ "_no_type"
 typefmt indent (Typeid bs) =
   indent ++ bytesToString bs
 

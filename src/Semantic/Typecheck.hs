@@ -1,6 +1,6 @@
 module Semantic.Typecheck where
 
-import Control.Lens (makeLenses, over)
+import Control.Lens (makeLenses, over, set)
 import Control.Monad.State
 import Data.ByteString.Char8
 import Data.List (intersect)
@@ -66,6 +66,19 @@ isSubtypeOf cenv c1 c2 = c2 `Prelude.elem` lub' cenv [c1, c2]
 -- TODO: do some form of an occurs-check for subtyping.
 -- this should probably happen when creating a new class
 -- (hence inheriting) and should be dependent on the context
+
+hasSubtypingLoop :: Type -> Type -> Context -> Either TypeError ()
+hasSubtypingLoop inh base ctx =
+  if inh `Prelude.elem` baseHierarchy
+    -- NOTE: funny thing is, the below expression doesn't loop
+    -- indefinitely because of the lazy evaluation of elem...
+    -- but baseHierarchy is, in fact, an infinite list if there is a loop :D
+    -- namely,
+    -- then Left $ SubtypingLoop $ inh : baseHierarchy
+    then Left $ SubtypingLoop $ inh : Prelude.takeWhile (/= inh) baseHierarchy ++ [inh]
+    else Right ()
+ where
+  baseHierarchy = ancestors (_classEnv ctx) base
 
 emptyCtx :: ClassName -> Context
 emptyCtx = Context M.empty M.empty builinClasses
@@ -225,39 +238,80 @@ typecheckAST ctx' expr = evalStateT (typecheckAST' expr) ctx'
     _ <- put ctx
     pure $ TypedExpr elub $ TCaseOf expr $ NE.fromList exprs'
 
+-- make this top-level because i need to share the context between classes.
+-- or maybe i don't. maybe this is totally idiotic. that would make it so
+-- that feautures in some class can be accessed from any class that is declared
+-- after the given one, essentially making them "global" and not local to the class,
+-- and i very much think that's not what we want here. wait nevermind. that's exactly what we want,
+-- except features would also depend on the class they have been defined in
+typecheckFeature' :: Feature -> StateT Context (Either TypeError) TypedFeature
+typecheckFeature' (AttrNoInit obj@(Objectid iden) (Typeid tyid) _) = do
+  let ty = toType tyid
+  -- TODO: idk?
+  modify (over objectEnv (M.insert obj ty))
+  pure $ TypedFeature ty (TAttrNoInit iden ty)
+typecheckFeature' (AttrInit obj@(Objectid iden) (Typeid tyid) expr _) = do
+  let ty = toType tyid
+  -- maybe not...
+  modify (over objectEnv (M.insert obj ty))
+  ctx <- get
+  modify (over objectEnv (M.insert (Objectid "self") SelfType))
+  ctx' <- get
+  let expr' = typecheckAST ctx' expr
+  _ <- put ctx
+  case expr' of
+    Left err -> lift $ Left err
+    Right e@(TypedExpr ety _) ->
+      if isSubtypeOf (_classEnv ctx') ety ty
+        then pure $ TypedFeature ty $ TAttrInit iden ty e
+        else lift $ Left $ IsNotSubtypeOf e (TypedExpr ty $ TId iden)
+typecheckFeature' (Method obj@(Objectid iden) args (Typeid tyid) body _) = undefined
+
 typecheckFeature :: Context -> Feature -> Either TypeError TypedFeature
 typecheckFeature ctx' feat = evalStateT (typecheckFeature' feat) ctx'
- where
-  typecheckFeature' :: Feature -> StateT Context (Either TypeError) TypedFeature
-  typecheckFeature' (AttrNoInit obj@(Objectid iden) (Typeid tyid) _) = do
-    let ty = toType tyid
-    -- TODO: idk?
-    modify (over objectEnv (M.insert obj ty))
-    pure $ TypedFeature ty (TAttrNoInit iden ty)
-  typecheckFeature' (AttrInit obj@(Objectid iden) (Typeid tyid) expr _) = do
-    let ty = toType tyid
-    -- maybe not...
-    modify (over objectEnv (M.insert obj ty))
-    ctx <- get
-    modify (over objectEnv (M.insert (Objectid "self") SelfType))
-    ctx' <- get
-    let expr' = typecheckAST ctx' expr
-    _ <- put ctx
-    case expr' of
-      Left err -> lift $ Left err
-      Right e@(TypedExpr ety _) ->
-        if isSubtypeOf (_classEnv ctx') ety ty
-          then pure $ TypedFeature ty $ TAttrInit iden ty e
-          else lift $ Left $ IsNotSubtypeOf e (TypedExpr ty $ TId iden)
-  typecheckFeature' (Method obj@(Objectid iden) args (Typeid tyid) body _) = undefined
 
 -- TODO: static dispatch, dynamic dispatch, attributes, methods
 
+typecheckClass' :: Class -> StateT Context (Either TypeError) TypedClass
+typecheckClass' (ClassInherits (Typeid ctype) _ feats _ _) = do
+  -- TODO: need some way to inspect the result and be able to roll back.
+  -- so far i can only think of a wrapped function that duplicates the current state
+  -- and only applies typechecking for the features - that way you can inspect what has happened,
+  -- and be able to revert the previous state. not sure if i actually need it, but might be
+  -- good for a more complex logic in the compiler
+  result <- mapM typecheckFeature' feats
+  pure $ TypedClass (toType ctype) result
+
 typecheckClass :: Context -> Class -> Either TypeError TypedClass
-typecheckClass = undefined
+typecheckClass ctx' class' = evalStateT (typecheckClass' class') ctx'
 
 typecheckProgram :: Context -> Program -> Either TypeError TypedProgram
-typecheckProgram = undefined
+typecheckProgram ctx' p' = evalStateT (typecheckProgram' p') ctx'
+ where
+  typecheckProgram' :: Program -> StateT Context (Either TypeError) TypedProgram
+  typecheckProgram' (Program classes _) = do
+    result <- typecheckSeq $ NE.toList classes
+    pure $ TypedProgram result
+
+  typecheckSeq :: [Class] -> StateT Context (Either TypeError) [TypedClass]
+  typecheckSeq [] = pure []
+  typecheckSeq (c@(ClassInherits (Typeid curr) (Typeid base) _ _ _) : cs) =
+    do
+      og <- get
+      let curr' = toType curr
+      let base' = toType base
+      case M.lookup curr' (_classEnv og) of
+        Nothing -> do
+          -- i cannot for the life of me remember what the lens operators for these were,
+          -- so we stick to verbosity for now
+          modify (over classEnv (M.insert curr' $ Just base') . set className curr')
+          ctx <- get
+          case hasSubtypingLoop curr' base' ctx of
+            -- TODO: perhaps roll back?
+            Left err -> lift $ Left err
+            -- this had better be sequential frfr.
+            _ -> liftA2 (:) (typecheckClass' c) (typecheckSeq cs)
+        Just _ -> lift $ Left $ RedefinitionOfClass curr'
 
 class Typeable a atyped | a -> atyped where
   typeof :: Context -> a -> Either TypeError atyped
@@ -269,7 +323,7 @@ instance Typeable Feature TypedFeature where
   typeof = typecheckFeature
 
 instance Typeable Class TypedClass where
-  typeof = undefined
+  typeof = typecheckClass
 
 instance Typeable Program TypedProgram where
-  typeof = undefined
+  typeof = typecheckProgram

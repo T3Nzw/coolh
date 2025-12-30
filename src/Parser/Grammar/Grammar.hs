@@ -2,6 +2,8 @@ module Parser.Grammar.Grammar where
 
 -- NOTE: <- has its own precedence...
 -- not sure how this plays into my grammar tbh.
+-- well, due to the nature of my grammar, it consumes
+-- as much input as possible to the right of it, so all is well
 -- comparison operators do not associate.
 -- TODO: encode precedence of all operators
 
@@ -305,42 +307,31 @@ neg = do
   expr <- ast
   pure $ Tilda notype expr pos
 
--- 3    +    4    *    12     +    5    EOF
---    30 31     40 41       30 31
+type OperationP = P.Parser String Lexemes (AST -> AST -> AST)
 
-operation :: P.Parser String Lexemes LexemeTag
-operation =
-  fmap (\(LexInfo (Lexeme tag _) _) -> tag)
-    $ foldr1 (<|>)
-    $ Prelude.map lsat [L.ADD, L.SUB, L.MUL, L.DIV, L.LT, L.LE, L.EQ]
+add :: OperationP
+add = lsat L.ADD >> pure (\lhs rhs -> Add notype lhs rhs (astpos rhs))
 
--- i struggled to write this for about 3 hrs at uni bc i had no paper.
--- wrote out the algorithm on paper and it finally works :)
--- update: it doesnt
-prec' :: AST -> BindingPower -> P.Parser String Lexemes AST
-prec' lhs (_, prevRbp) = do
-  opm <- P.zeroOrOne $ P.lookahead operation
+sub :: OperationP
+sub = lsat L.SUB >> pure (\lhs rhs -> Sub notype lhs rhs (astpos rhs))
 
-  case opm of
-    Nothing -> pure lhs
-    Just op -> do
-      _ <- operation -- consume the operation
-      case M.lookup op bpInfo of
-        Nothing -> empty
-        Just (PrattPrec (lbp, rbp) ctor)
-          -- we use equal left and right binding powers to signify non-associative operators
-          | lbp == rbp -> undefined
-          | prevRbp < lbp -> do
-              rhs <- ast'
-              prec' (ctor notype lhs rhs $ astpos rhs) (lbp, rbp)
-          | otherwise -> do
-              rhs <- prec (lbp, rbp)
-              pure $ ctor notype lhs rhs $ astpos rhs
+mul :: OperationP
+mul = lsat L.MUL >> pure (\lhs rhs -> Mul notype lhs rhs (astpos rhs))
 
-prec :: BindingPower -> P.Parser String Lexemes AST
-prec bp = do
-  lhs <- ast'
-  prec' lhs bp
+div :: OperationP
+div = lsat L.DIV >> pure (\lhs rhs -> Div notype lhs rhs (astpos rhs))
+
+lt :: OperationP
+lt = lsat L.LT >> pure (\lhs rhs -> Lt notype lhs rhs (astpos rhs))
+
+leq :: OperationP
+leq = lsat L.LE >> pure (\lhs rhs -> Leq notype lhs rhs (astpos rhs))
+
+eq :: OperationP
+eq = lsat L.EQ >> pure (\lhs rhs -> Eq notype lhs rhs (astpos rhs))
+
+prec :: P.Parser String Lexemes AST
+prec = P.chain1 convert bpInfo (0, 1) ast' $ P.choice [add, sub, mul, div, lt, leq, eq]
 
 ast' :: P.Parser String Lexemes AST
 ast' =
@@ -364,19 +355,15 @@ ast' =
     , Parser.Grammar.Grammar.id
     ]
 
--- TODO: make a parser for eliminating left recursion.
--- well, instead of eliminating left recursion, it creates it :D
+-- TODO: add dynamic dispatch to this
 lr :: AST -> P.Parser String Lexemes AST
 lr obj = (staticDispatch obj >>= lr) <|> pure obj
 
 -- some sort of left factoring
 ast :: P.Parser String Lexemes AST
 ast = do
-  base <- prec (0, 1) <|> ast'
-  LexInfo (Lexeme tag _) _ <- P.peek
-  case tag of
-    L.EOF -> pure base
-    _ -> lr base
+  base <- prec <|> ast'
+  lr base
 
 parse :: FilePath -> Lexemes -> Either String Program
 parse fp lexemes = fst <$> runParser (program fp) (initial lexemes)
