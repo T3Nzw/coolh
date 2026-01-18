@@ -38,7 +38,11 @@ executable coolh
                         Semantic.TypedAST,
                         Semantic.Error,
                         Semantic.Typecheck,
-                        ReplTests
+                        ReplTests,
+                        CodeGen.Monad,
+                        CodeGen.Pretty,
+                        CodeGen.Emit,
+                        CodeGen.Instr
 
     default-extensions: KindSignatures,
                         TypeFamilies,

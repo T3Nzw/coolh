@@ -38,7 +38,7 @@ data MProgram
   , _filename :: FilePath
   }
 
-data Typeid = Typeid ByteString
+newtype Typeid = Typeid ByteString
   deriving (Show, Eq, Ord)
 
 notype :: Typeid
@@ -111,7 +111,7 @@ data AST
   -- so postponing this to a later stage. shouldn't cause any problems as is
   | Parenthesised AST SourcePos -- ok
   | StaticDispatch Typeid AST Typeid Objectid [AST] SourcePos
-  | Dispatch Typeid AST Objectid [AST] SourcePos
+  | DynamicDispatch Typeid AST Objectid [AST] SourcePos
   | Id Typeid Objectid SourcePos
   | Number Typeid Objectid SourcePos -- ok
   | Str Typeid Objectid SourcePos -- ok
@@ -141,7 +141,7 @@ astpos = \case
   Not _ _ p -> p
   Parenthesised _ p -> p
   StaticDispatch _ _ _ _ _ p -> p
-  Dispatch _ _ _ _ p -> p
+  DynamicDispatch _ _ _ _ p -> p
   Id _ _ p -> p
   Number _ _ p -> p
   Str _ _ p -> p
@@ -382,7 +382,7 @@ astfmt indent (StaticDispatch ty obj ty2 iden args pos) =
         ++ indent
         ++ ":"
         ++ typefmt " " ty
-astfmt indent (Dispatch ty obj iden args pos) =
+astfmt indent (DynamicDispatch ty obj iden args pos) =
   let indent' = idInc indent
    in posfmt indent pos
         ++ astnode indent "_dispatch"

@@ -15,11 +15,8 @@ import Semantic.Error
 import Semantic.TypedAST
 
 type ObjectEnv = M.Map Objectid Type
-
 type MethodEnv = M.Map Feature Type
-
 type ClassEnv = M.Map Type (Maybe Type)
-
 type ClassName = Type
 
 data Context
@@ -53,6 +50,7 @@ ancestors cenv c =
     _ -> []
 
 lub' :: ClassEnv -> [ClassName] -> [ClassName]
+-- or do they? what about Void?
 lub' _ [] = error "every two types in cool have a lub! :("
 lub' cenv [c] = ancestors cenv c
 lub' cenv (c : cs) = ancestors cenv c `intersect` lub' cenv cs

@@ -298,7 +298,7 @@ dispatch = do
   _ <- lsat L.LPAREN
   args <- concatMap toList <$> P.many (commaSep ast)
   pos <- extractPos <$> lsat L.RPAREN
-  pure $ Dispatch notype (selfObj selfPos) iden args pos
+  pure $ DynamicDispatch notype (selfObj selfPos) iden args pos
 
 neg :: P.Parser String Lexemes AST
 neg = do

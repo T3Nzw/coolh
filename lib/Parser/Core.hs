@@ -224,7 +224,15 @@ inspect p = MkParser $ \inp -> do
        in Right ((val, Data.Stream.take (abso2 - abso1) $ inp ^. Pos.input), st)
 
 -- precedence parsing combinator, inspired by pratt parsing
-chain1Rhs :: (Monoid e, Ord repr, Stream s) => (s -> repr) -> M.Map repr (Int, Int) -> (Int, Int) -> a -> Parser e s a -> Parser e s (a -> a -> a) -> Parser e s a
+chain1Rhs
+  :: (Monoid e, Ord repr, Stream s)
+  => (s -> repr)
+  -> M.Map repr (Int, Int)
+  -> (Int, Int)
+  -> a
+  -> Parser e s a
+  -> Parser e s (a -> a -> a)
+  -> Parser e s a
 chain1Rhs convert table (prevLbp, prevRbp) lhs atomp opp = do
   operation <- lookahead $ inspect opp
   case operation of
@@ -240,7 +248,14 @@ chain1Rhs convert table (prevLbp, prevRbp) lhs atomp opp = do
               chain1Rhs convert table (prevLbp, prevRbp) (lhs `op` rhs) atomp opp
           | otherwise -> pure lhs
 
-chain1 :: (Monoid e, Ord repr, Stream s) => (s -> repr) -> M.Map repr (Int, Int) -> (Int, Int) -> Parser e s a -> Parser e s (a -> a -> a) -> Parser e s a
+chain1
+  :: (Monoid e, Ord repr, Stream s)
+  => (s -> repr)
+  -> M.Map repr (Int, Int)
+  -> (Int, Int)
+  -> Parser e s a
+  -> Parser e s (a -> a -> a)
+  -> Parser e s a
 chain1 convert table bp atompp opp = do
   lhs <- atompp
   chain1Rhs convert table bp lhs atompp opp

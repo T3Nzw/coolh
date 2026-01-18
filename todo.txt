@@ -12,7 +12,7 @@ TODO:
                      CODEGEN
 *****************************************************
 
-[] monadic combinators for code generation
+[x] monadic combinators for code generation
 
 *****************************************************
                  SEMANTIC ANALYSER
@@ -65,6 +65,8 @@ TODO:
 [] static dispatch
 
 [] clean up formatting of the ast
+
+[] make ~ bind tighter
 
 *****************************************************
                        LEXER
